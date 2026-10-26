@@ -1,0 +1,5 @@
+#!/bin/sh
+# Full check of the library: unit tests (Robolectric at the Billing SDK boundary), lint, release build.
+set -eu
+cd "$(dirname "$0")/.."
+./gradlew --quiet :unlock:testDebugUnitTest :unlock:lintDebug :unlock:assembleRelease
