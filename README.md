@@ -9,7 +9,7 @@ The app includes this repository as a Gradle composite build (ADR-0001). In the 
 `settings.gradle.kts`:
 
 ```kotlin
-// tearoom-android-kit: path from the Gradle property tearoomKitPath, else ~/Work/Projects/tearoom-android-kit.
+// tearoom-android-kit: path from the Gradle property tearoomKitPath, else ~/Work/Projects/apps/tearoom-android-kit.
 val tearoomKit = providers.gradleProperty("tearoomKitPath").orNull
     ?: "${System.getProperty("user.home")}/Work/Projects/tearoom-android-kit"
 check(file(tearoomKit).resolve("settings.gradle.kts").isFile) {
