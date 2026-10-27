@@ -5,11 +5,11 @@ Status: accepted, 26 October 2026 (user decision, Mathis).
 ## Decision
 
 - Shared Android code for the tearoom.one apps lives in this repository,
-  `~/Work/Projects/tearoom-android-kit`, local only for now (no remote, no published artifact).
+  `~/Work/Projects/apps/tearoom-android-kit`, local only for now (no remote, no published artifact).
 - Apps include it with `includeBuild(...)` in their `settings.gradle.kts` and depend on Maven-style
   coordinates such as `one.tearoom:unlock:1.0.0`; Gradle substitutes the included project.
 - The path comes from the Gradle property `tearoomKitPath` (for example in
-  `~/.gradle/gradle.properties`), with `~/Work/Projects/tearoom-android-kit` as the fallback. Relative
+  `~/.gradle/gradle.properties`), with `~/Work/Projects/apps/tearoom-android-kit` as the fallback. Relative
   paths do not fit, since the apps sit at different depths (`~/Work/Projects/...`,
   `~/Work/AndroidStudioProjects/...`). Without the library the build stops with a clear message.
 

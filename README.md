@@ -11,7 +11,7 @@ The app includes this repository as a Gradle composite build (ADR-0001). In the 
 ```kotlin
 // tearoom-android-kit: path from the Gradle property tearoomKitPath, else ~/Work/Projects/apps/tearoom-android-kit.
 val tearoomKit = providers.gradleProperty("tearoomKitPath").orNull
-    ?: "${System.getProperty("user.home")}/Work/Projects/tearoom-android-kit"
+    ?: "${System.getProperty("user.home")}/Work/Projects/apps/tearoom-android-kit"
 check(file(tearoomKit).resolve("settings.gradle.kts").isFile) {
     "tearoom-android-kit not found at $tearoomKit; set tearoomKitPath in ~/.gradle/gradle.properties"
 }
@@ -56,6 +56,17 @@ Behaviour: 15 s timeout per Play request, two retries (2 s, 4 s) for transient e
 ignored, the shown price kept while a refresh runs, the cached unlock kept when Play cannot be
 reached, removed after a successful answer without the purchase (refund), pending payments never
 unlock, acknowledgement retried, rental and preorder offers never sold as the permanent unlock.
+
+## Apps on this library
+
+Since 27 October 2026 no app has its own Play Billing code; each keeps one `OneTimeUnlock` in a small
+holder (`Pro`/`Plus` object) that maps `UnlockMessage` and `PriceProblem` to its strings.
+
+| App | Product | Prefs (name/key) | Debug unlock |
+|---|---|---|---|
+| Dahlia | `pro` | `pro` / `owned` | resource `pro_for_testing` (debug and fast builds) |
+| Lazy Moves | `plus_unlock` | `plus` / `unlocked` | debug build with the `pref_debug_simulate_plus` setting |
+| Weatherfold | `pro` | `pro` / `unlocked` | debug build unless the `debug_free` preference is set |
 
 ## Checks
 
