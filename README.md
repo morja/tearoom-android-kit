@@ -5,16 +5,24 @@ unlock through Google Play Billing (taken over from Lazy Moves, billing hardenin
 
 ## Using it in an app
 
-The app includes this repository as a Gradle composite build (ADR-0001). In the app's
-`settings.gradle.kts`:
+Clone this repository next to the app repository (same parent folder):
+
+```sh
+git clone https://github.com/morja/tearoom-android-kit.git
+```
+
+The app includes it as a Gradle composite build (ADR-0001). In the app's `settings.gradle.kts`:
 
 ```kotlin
-// tearoom-android-kit: path from the Gradle property tearoomKitPath, else ~/Work/Projects/apps/tearoom-android-kit.
+// tearoom-android-kit (https://github.com/morja/tearoom-android-kit): the Gradle property
+// tearoomKitPath, else a checkout next to this repository, else ~/Work/Projects/apps/tearoom-android-kit.
 val tearoomKit = providers.gradleProperty("tearoomKitPath").orNull
-    ?: "${System.getProperty("user.home")}/Work/Projects/apps/tearoom-android-kit"
-check(file(tearoomKit).resolve("settings.gradle.kts").isFile) {
-    "tearoom-android-kit not found at $tearoomKit; set tearoomKitPath in ~/.gradle/gradle.properties"
-}
+    ?: listOf(
+        rootDir.resolve("../tearoom-android-kit"),
+        rootDir.resolve("../../tearoom-android-kit"),
+        file("${System.getProperty("user.home")}/Work/Projects/apps/tearoom-android-kit"),
+    ).firstOrNull { it.resolve("settings.gradle.kts").isFile }?.canonicalPath
+    ?: error("tearoom-android-kit not found: clone https://github.com/morja/tearoom-android-kit next to this repository or set tearoomKitPath")
 includeBuild(tearoomKit)
 ```
 
@@ -73,3 +81,7 @@ holder (`Pro`/`Plus` object) that maps `UnlockMessage` and `PriceProblem` to its
 ```sh
 scripts/check
 ```
+
+## Licence
+
+Apache License 2.0, see [LICENSE](LICENSE).
