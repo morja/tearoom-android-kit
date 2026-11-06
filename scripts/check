@@ -1,6 +1,7 @@
 #!/bin/sh
 # Full check of the library: unit tests (:testing on its fixture tree, :unlock with Robolectric at the
-# Billing SDK boundary), lint, release build.
+# Billing SDK boundary, :unlock-ui its guardrails), lint, release builds.
 set -eu
 cd "$(dirname "$0")/.."
-./gradlew --quiet :testing:test :unlock:testDebugUnitTest :unlock:lintDebug :unlock:assembleRelease
+./gradlew --quiet :testing:test :unlock:testDebugUnitTest :unlock:lintDebug :unlock:assembleRelease \
+  :unlock-ui:testDebugUnitTest :unlock-ui:lintDebug :unlock-ui:assembleRelease
