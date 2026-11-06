@@ -48,6 +48,9 @@ class PermissionFlow(
     initialAsk: PermissionAsk? = null,
     private val onResult: (PermissionState) -> Unit = {},
 ) {
+    /** The steps whose silent answer this process saw itself; a mark from before is tried once more. Before [_state]: read() needs it. */
+    private val blockedSeen = mutableSetOf<PermissionKind>()
+
     private val _state = MutableStateFlow(read(ask = initialAsk, busy = false))
 
     /** Everything a permission surface shows. */
@@ -65,14 +68,12 @@ class PermissionFlow(
     private var open: PermissionKind? = null
     private var inSettings = false
 
-    /** The steps whose silent answer this process saw itself; a mark from before is tried once more. */
-    private val blockedSeen = mutableSetOf<PermissionKind>()
 
     /** The user started the feature. Usable: [onResult] runs at once. Otherwise the reason, the dialog or the settings path. */
     fun start() {
         val current = read()
         if (current.busy) return
-        move(current, PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.stage in blockedSeen))
+        move(current, PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.confirmed))
     }
 
     /** From the reason: on to the system dialog. Also for a control whose line already says why. */
@@ -169,7 +170,7 @@ class PermissionFlow(
         }
         if (answered != null && current.stage != answered) {
             // The first step came through: the next follows from the same tap, with the reason first where the app wants it.
-            val next = PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.stage in blockedSeen)
+            val next = PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.confirmed)
             move(current, next)
             if (next == PermissionPolicy.Move.SETTINGS) onResult(_state.value)
             return
@@ -192,7 +193,8 @@ class PermissionFlow(
         val status = PermissionPolicy.status(stage, granted, rationale, marked, sdk)
         // A mark from before a grant in the settings, or before Android asks again, is stale.
         if (marked && status != PermissionStatus.BLOCKED) platform.markBlocked(stage, false)
-        return PermissionState(permission.kind, stage, status, ask, busy)
+        val confirmed = status != PermissionStatus.BLOCKED || stage in blockedSeen
+        return PermissionState(permission.kind, stage, status, ask, busy, confirmed)
     }
 }
 

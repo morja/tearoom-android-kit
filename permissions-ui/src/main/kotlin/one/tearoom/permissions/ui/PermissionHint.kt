@@ -19,17 +19,21 @@ import one.tearoom.permissions.PermissionStatus
  * so). Empty while the permission is usable. Otherwise the text for the state (the reason before the
  * first ask, the refusal after one, the settings path after two, what a full grant would add after
  * a partial one) and the one control that helps: "Allow" opens the system dialog at once, since the
- * line has said why; "Open settings" where only the settings help.
+ * line has said why; "Open settings" where only the settings help. A block that only a mark from an
+ * earlier process remembers reads like a refusal: "Allow" asks Android once more, and the settings
+ * path follows at once when it stands.
  */
 @Composable
 fun PermissionHint(flow: PermissionFlow, modifier: Modifier = Modifier, style: PermissionStyle = PermissionStyle()) {
     val state by flow.state.collectAsState()
     val texts = flow.texts
-    val settingsOnly = state.status == PermissionStatus.BLOCKED || (state.status == PermissionStatus.PARTIAL && state.usable)
+    // A block only a mark remembers is offered like a refusal: "Allow" asks Android once more, which answers at once when it stands.
+    val blocked = state.status == PermissionStatus.BLOCKED && state.confirmed
+    val settingsOnly = blocked || (state.status == PermissionStatus.PARTIAL && state.usable)
     val text = when (state.status) {
         PermissionStatus.NOT_ASKED -> stringResource(texts.reason)
         PermissionStatus.DENIED -> stringResource(texts.denied)
-        PermissionStatus.BLOCKED -> stringResource(texts.blocked, flow.settingsOption())
+        PermissionStatus.BLOCKED -> if (blocked) stringResource(texts.blocked, flow.settingsOption()) else stringResource(texts.denied)
         PermissionStatus.PARTIAL -> texts.partial?.let { stringResource(it) } ?: return
         PermissionStatus.GRANTED, PermissionStatus.NOT_NEEDED -> return
     }

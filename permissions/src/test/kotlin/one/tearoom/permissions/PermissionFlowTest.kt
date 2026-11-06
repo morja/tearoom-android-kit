@@ -108,15 +108,17 @@ class PermissionFlowTest {
         assertTrue(device.marked(PermissionKind.Camera))
         assertEquals(2, results.size)
 
-        // The next process remembers the line, but the tap asks Android once more; the silent answer confirms it.
+        // The next process remembers the line, unconfirmed; the tap asks Android once more and the silent answer confirms it.
         device.launched = null
         val next = flow(cameraOnScreen)
         assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
+        assertFalse(next.state.value.confirmed)
         next.start()
         assertEquals(listOf(CAMERA), device.launched)
         device.answer(next, dialog = false)
         assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, next.state.value.ask)
+        assertTrue(next.state.value.confirmed)
 
         // Seen in this process: straight to the settings path.
         device.launched = null

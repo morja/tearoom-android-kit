@@ -42,6 +42,10 @@ enum class PermissionAsk {
  * @param status where [stage] stands.
  * @param ask what the surface shows now; null for nothing.
  * @param busy the system dialog or the settings page is open; a tap on the feature waits.
+ * @param confirmed Android confirmed [status] to this process. False only for [PermissionStatus.BLOCKED]
+ *   that rests on the mark of an earlier process, which may be stale (a reinstall with a backup,
+ *   Android's reset of an unused app): a surface then offers to ask once more, and the flow tries
+ *   Android before it names the settings path.
  */
 data class PermissionState(
     val kind: PermissionKind,
@@ -49,6 +53,7 @@ data class PermissionState(
     val status: PermissionStatus,
     val ask: PermissionAsk? = null,
     val busy: Boolean = false,
+    val confirmed: Boolean = true,
 ) {
     /** The feature may run: the whole kind is granted, not needed here, or partially granted where that is enough. */
     val usable: Boolean
