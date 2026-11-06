@@ -98,7 +98,11 @@ object PermissionSettings {
             val controller = context.packageManager.resolveActivity(Intent(REQUEST_PERMISSIONS), 0)!!.activityInfo.packageName
             val resources = context.createPackageContext(controller, 0)
                 .createConfigurationContext(Configuration().apply { setLocales(system) }).resources
-            resources.getString(resources.getIdentifier("app_permission_button_allow_always", "string", controller))
+            // The controller's resources keep the AOSP package name even in Google's build of it (QA-9).
+            val id = listOf(CONTROLLER_RESOURCES, controller)
+                .map { resources.getIdentifier("app_permission_button_allow_always", "string", it) }
+                .first { it != 0 }
+            resources.getString(id)
         }.getOrDefault(label)
     }
 
@@ -132,6 +136,7 @@ object PermissionSettings {
     }
 
     private const val REQUEST_PERMISSIONS = "android.content.pm.action.REQUEST_PERMISSIONS"
+    private const val CONTROLLER_RESOURCES = "com.android.permissioncontroller"
 }
 
 /**
