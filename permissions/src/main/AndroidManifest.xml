@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Reads the system's own name of "Allow all the time" in the system language (PermissionSettings). -->
+    <queries>
+        <intent>
+            <action android:name="android.content.pm.action.REQUEST_PERMISSIONS" />
+        </intent>
+    </queries>
+</manifest>

@@ -3,8 +3,9 @@
 Shared Android code for the tearoom.one apps. Modules: `unlock`, a hardened one-time Pro/Plus unlock
 through Google Play Billing (taken over from Lazy Moves, billing hardening of 16 October 2026) with
 `AppUnlock` as the one holder every app declares; `unlock-ui`, the default purchase surface in Compose
-and Material 3; and `testing`, the rules behind the apps' guardrail tests as a pure JVM library. The
-rule behind the first two: flows in the kit, surfaces in the apps (ADR-0004).
+and Material 3; `permissions`, one flow for asking, losing and recovering a runtime permission, with
+`permissions-ui` as its default surface; and `testing`, the rules behind the apps' guardrail tests as
+a pure JVM library. The rule behind the flows: flows in the kit, surfaces in the apps (ADR-0004).
 
 ## Using it in an app
 
@@ -34,10 +35,13 @@ and in the app module:
 ```kotlin
 implementation("one.tearoom:unlock:1.1.0")
 implementation("one.tearoom:unlock-ui:1.1.0") // the default purchase sheet; apps with their own surface skip it
+implementation("one.tearoom:permissions:1.0.0")
+implementation("one.tearoom:permissions-ui:1.0.0") // the default permission sheet and hint; the same rule
 testImplementation("one.tearoom:testing:1.0.0")
 ```
 
-`unlock-ui` compiles against the Compose BOM 2026.09.00 (compileSdk 37); an app on it uses the same BOM.
+`unlock-ui` and `permissions-ui` compile against the Compose BOM 2026.09.00 (compileSdk 37); an app on
+them uses the same BOM.
 
 To use another checkout, set the property once in `~/.gradle/gradle.properties`:
 
@@ -113,6 +117,55 @@ if (showingPro) {
 - `UnlockStyle` holds the spacing (`horizontalPadding`, `bottomPadding`, `gap` inside a group,
   `groupGap` between groups, `fullWidthButton`); pass the app's tokens. `body` replaces the panel for
   an app with another layout over the same flow.
+
+## permissions in short
+
+```kotlin
+// One top-level value per kind the app uses; screens, widgets and workers ask it.
+val Notifications = AppPermission(
+    PermissionKind.Notifications,
+    PermissionTexts(
+        reason = R.string.notifications_reason,      // "Paperboat shows a quiet notification while it keeps your devices in sync."
+        denied = R.string.notifications_denied,      // names the permission as the reason the feature waits
+        blocked = R.string.notifications_blocked,    // the settings path; %1$s is the option to pick there
+        allow = R.string.permission_allow, openSettings = R.string.permission_open_settings, notNow = R.string.permission_not_now,
+    ),
+)
+// The background location builds on the foreground location, each with its own texts.
+val DeviceLocation = AppPermission(PermissionKind.Location(), PermissionTexts(...), explain = Explain.SCREEN)
+val WidgetLocation = AppPermission(PermissionKind.BackgroundLocation(), PermissionTexts(...), explain = Explain.SCREEN, first = DeviceLocation)
+```
+
+```kotlin
+// A Compose screen: the flow from the composition, the feature from one place.
+val notifications = rememberPermissionFlow(Notifications) { if (it.usable) startSync() }
+Button(onClick = notifications::start) { Text(stringResource(R.string.turn_on_sync)) }
+PermissionSheet(notifications)                    // the reason before the dialog, the settings path when blocked
+PermissionHint(notifications)                     // the persistent line while the feature is on and the permission off
+
+// An activity: register before it starts.
+private val location = DeviceLocation.request(this) { if (it.usable) startRecording() }
+```
+
+- Kinds: `Location(precision)` (approximate; precise with approximate accepted; precise required),
+  `BackgroundLocation(precision)` with `first` as its foreground step, `Notifications`,
+  `Media(images, video, audio)`, `NearbyDevices(scan, connect, wifi)`, `Camera`, `Microphone`. The
+  kind holds the Android version branches; the app never checks `Build.VERSION` for a permission.
+- `start()` on the tap that starts the feature: usable, and `onResult` runs at once; otherwise the
+  app's reason (`PermissionAsk.REASON`, or straight to the dialog with `Explain.SCREEN` where the
+  screen says why), the system dialog, or the settings path (`PermissionAsk.SETTINGS`) once Android
+  answers without a dialog. `proceed()` from the reason, `openSettings()`, `dismiss()`; `refresh()`
+  runs on every resume, so a grant or a revoke in the settings shows at once.
+- `state` (`PermissionState`: `status`, `stage`, `ask`, `busy`, `usable`) is everything a surface
+  shows; an app with a surface of its own reads it and calls the same methods. `status.textRes(texts)`
+  gives the app's line for a status, `flow.texts` the texts of the step being asked for.
+- Background work reads `Permission.isUsable(context)` (or `isGranted` for the full grant), which
+  asks the system every time. Nothing is cached across starts (skill `android-permissions`); the only
+  mark kept is "answered without a dialog", in the kit's own preferences file, cleared by a grant.
+- `PermissionSheet` and `PermissionHint` are Material 3, drawn from the host app's `MaterialTheme`,
+  spacing through `PermissionStyle`. Texts come from `PermissionTexts`; the settings path's `%1$s`
+  is Android's own name of "Allow all the time" for the background location, the permission group's
+  label otherwise.
 
 ## testing in short
 
