@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "tearoom-android-kit"
-include(":unlock")
+include(":unlock", ":testing")

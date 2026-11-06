@@ -1,0 +1,15 @@
+<resources>
+    <string name="hello">Hallo</string>
+    <string name="greet">%2$d neue, hallo %1$s</string>
+    <string name="raw" formatted="false">100%</string>
+    <string name="extra">Zu viel</string>
+    <plurals name="days">
+        <item quantity="other">%s Tage</item>
+    </plurals>
+    <plurals name="hours">
+        <item quantity="one">Eine Stunde</item>
+    </plurals>
+    <string-array name="modes">
+        <item>A</item>
+    </string-array>
+</resources>

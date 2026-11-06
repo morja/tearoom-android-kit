@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="app_name" translatable="false">Demo</string>
+    <string name="hello">Hello</string>
+    <string name="greet">Hi <xliff:g id="name">%1$s</xliff:g>, %2$d new</string>
+    <string name="untranslated">Only here</string>
+    <string name="raw" formatted="false">100% %s</string>
+    <plurals name="days">
+        <item quantity="one">One day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="hours">
+        <item quantity="one">One hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <string-array name="modes">
+        <item>A</item>
+        <item>B</item>
+    </string-array>
+</resources>
