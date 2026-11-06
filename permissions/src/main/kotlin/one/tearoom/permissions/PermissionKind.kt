@@ -106,6 +106,11 @@ sealed class PermissionKind {
         override fun permissions(sdk: Int) = listOf(Manifest.permission.RECORD_AUDIO)
     }
 
+    /** Step counting and activity recognition (a runtime permission since Android 10; before that nothing is asked). Lazy Moves' departures. */
+    data object PhysicalActivity : PermissionKind() {
+        override fun permissions(sdk: Int) = if (sdk >= 29) listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList()
+    }
+
     private companion object {
         const val COARSE = Manifest.permission.ACCESS_COARSE_LOCATION
         const val FINE = Manifest.permission.ACCESS_FINE_LOCATION

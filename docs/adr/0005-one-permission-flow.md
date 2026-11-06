@@ -12,7 +12,8 @@ Status: accepted, 6 November 2026 (user decision, Mathis: every permission kind 
   `MaterialTheme`. Apps own the words, the place and, where they want, the surface.
 - One kind per feature, never a manifest permission by name: location (approximate, precise, precise
   required), background location as the second step after the foreground location, notifications,
-  photos and media, nearby devices, camera, microphone. The kind holds the Android version branches
+  photos and media, nearby devices, camera, microphone, and physical activity (Lazy Moves' departures,
+  not in the skill but the same flow). The kind holds the Android version branches
   (notifications from 13, background location from 10, the media eras up to the selected photos of
   14, Bluetooth permissions from 12 with the fine location before), so an app never checks
   `Build.VERSION` for a permission.
@@ -55,7 +56,8 @@ Status: accepted, 6 November 2026 (user decision, Mathis: every permission kind 
 
 - New modules `:permissions` 1.0.0 (`androidx.activity`, coroutines, annotation) and
   `:permissions-ui` 1.0.0 (Compose BOM 2026.09.00, activity-compose, lifecycle-runtime-compose); the
-  apps name both, Weatherfold only the first.
+  apps name both. Weatherfold takes only `rememberPermissionFlow` from the second and draws its own
+  pages; Health Connect's permissions (Lazy Moves) stay outside, they have their own contract.
 - `PermissionTexts` has six ids per kind (reason, denied, blocked, allow, open settings, not now) and
   an optional seventh for a partial grant, in every language the app ships. The kit's manifest adds
   the `<queries>` entry for the permission controller, which Weatherfold carried alone.

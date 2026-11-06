@@ -149,8 +149,9 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
 
 - Kinds: `Location(precision)` (approximate; precise with approximate accepted; precise required),
   `BackgroundLocation(precision)` with `first` as its foreground step, `Notifications`,
-  `Media(images, video, audio)`, `NearbyDevices(scan, connect, wifi)`, `Camera`, `Microphone`. The
-  kind holds the Android version branches; the app never checks `Build.VERSION` for a permission.
+  `Media(images, video, audio)`, `NearbyDevices(scan, connect, wifi)`, `Camera`, `Microphone`,
+  `PhysicalActivity`. The kind holds the Android version branches; the app never checks
+  `Build.VERSION` for a permission.
 - `start()` on the tap that starts the feature: usable, and `onResult` runs at once; otherwise the
   app's reason (`PermissionAsk.REASON`, or straight to the dialog with `Explain.SCREEN` where the
   screen says why), the system dialog, or the settings path (`PermissionAsk.SETTINGS`) once Android

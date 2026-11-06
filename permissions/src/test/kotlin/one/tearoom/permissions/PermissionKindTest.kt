@@ -83,6 +83,11 @@ class PermissionKindTest {
         assertEquals(listOf(android.Manifest.permission.RECORD_AUDIO), PermissionKind.Microphone.permissions(36))
     }
 
+    @Test fun `physical activity is a runtime permission from Android 10`() {
+        assertEquals(emptyList<String>(), PermissionKind.PhysicalActivity.permissions(28))
+        assertEquals(listOf(android.Manifest.permission.ACTIVITY_RECOGNITION), PermissionKind.PhysicalActivity.permissions(29))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `media must ask for something`() {
         PermissionKind.Media(images = false)
