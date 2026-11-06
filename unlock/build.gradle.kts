@@ -4,7 +4,7 @@ plugins {
 
 // Apps depend on "one.tearoom:unlock"; the composite build substitutes this project (ADR-0001).
 group = "one.tearoom"
-version = "1.1.0"
+version = "1.1.1"
 
 android {
     namespace = "one.tearoom.unlock"

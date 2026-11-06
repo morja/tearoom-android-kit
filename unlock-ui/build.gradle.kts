@@ -7,7 +7,7 @@ plugins {
 // The default purchase surface of the unlock flow (ADR-0004): Compose, Material 3, drawn from the
 // host app's MaterialTheme. No theme of its own, no text of its own.
 group = "one.tearoom"
-version = "1.1.0"
+version = "1.1.1"
 
 android {
     namespace = "one.tearoom.unlock.ui"

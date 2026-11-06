@@ -7,11 +7,11 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
 
 ## Modules
 
-- `:unlock` (`one.tearoom:unlock`, 1.1.0) – one permanent one-time purchase through Google Play
+- `:unlock` (`one.tearoom:unlock`, 1.1.1) – one permanent one-time purchase through Google Play
   Billing: `AppUnlock` (the one holder every app declares) over `OneTimeUnlock`, `UnlockConfig`,
   `UnlockTexts` with `textRes`, `UnlockState`, pure rules in `UnlockPolicy`. Verification stays on the
   device (ADR-0002); the flow is the kit's, the surface the app's (ADR-0004).
-- `:unlock-ui` (`one.tearoom:unlock-ui`, 1.1.0) – the default purchase surface: `UnlockPanel` (buy,
+- `:unlock-ui` (`one.tearoom:unlock-ui`, 1.1.1) – the default purchase surface: `UnlockPanel` (buy,
   try again, restore, Play's feedback) and `UnlockSheet` (a Material 3 bottom sheet around it with
   title, intro and body slots), drawn from the host app's `MaterialTheme`; spacing through
   `UnlockStyle`, the only file with sizes. No theme, no text of its own.

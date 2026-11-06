@@ -37,7 +37,8 @@ once, that behaves the same in every app; surfaces may differ per app, behaviour
 
 ## Consequences
 
-- `:unlock` 1.1.0 and `:unlock-ui` 1.1.0; the apps name both. `UnlockTexts` has sixteen ids, so an app
+- `:unlock` and `:unlock-ui` share one version (1.1.1 since the fixes of 6 November 2026, tag
+  `unlock-1.1.1`); the apps name both. `UnlockTexts` has sixteen ids, so an app
   provides the five button texts too (buy with price, buy without price, loading price, try again,
   restore), in every language it ships.
 - New dependencies in the kit: Compose (BOM, ui, foundation, material3) in `:unlock-ui`, and

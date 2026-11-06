@@ -33,8 +33,8 @@ includeBuild(tearoomKit)
 and in the app module:
 
 ```kotlin
-implementation("one.tearoom:unlock:1.1.0")
-implementation("one.tearoom:unlock-ui:1.1.0") // the default purchase sheet; apps with their own surface skip it
+implementation("one.tearoom:unlock:1.1.1")
+implementation("one.tearoom:unlock-ui:1.1.1") // the default purchase sheet; apps with their own surface skip it
 implementation("one.tearoom:permissions:1.0.0")
 implementation("one.tearoom:permissions-ui:1.0.0") // the default permission sheet and hint; the same rule
 testImplementation("one.tearoom:testing:1.0.0")
@@ -91,6 +91,15 @@ Behaviour: 15 s timeout per Play request, two retries (2 s, 4 s) for transient e
 ignored, the shown price kept while a refresh runs, the cached unlock kept when Play cannot be
 reached, removed after a successful answer without the purchase (refund), pending payments never
 unlock, acknowledgement retried, rental and preorder offers never sold as the permanent unlock.
+
+Versions (tags `unlock-x.y.z` mark the state of both `unlock` and `unlock-ui`):
+
+- 1.1.1 (6 November 2026): the sheet scrolls and clears Play's message only when the user dismisses
+  it; the app's debug unlock is read again on every refresh, restore and purchase; restoring while a
+  payment is pending reports `PENDING` instead of `NOT_FOUND`.
+- 1.1.0 (6 November 2026): `AppUnlock`, `UnlockTexts`, the fragment constraint; `unlock-ui` with
+  `UnlockPanel` and `UnlockSheet` (the tag `unlock-1.1.0` predates `unlock-ui`; use 1.1.1).
+- 1.0.0 (27 October 2026): `OneTimeUnlock`, taken over from Lazy Moves.
 
 ## unlock-ui in short
 
@@ -222,10 +231,10 @@ Since 27 October 2026 no app has its own Play Billing code; since 6 November 202
 
 | App | Product | Prefs (name/key) | Debug unlock | Surface | Kit tested with |
 |---|---|---|---|---|---|
-| Dahlia | `pro` | `pro` / `owned` | resource `pro_for_testing` (debug and fast builds); the `free` build counts as not Pro | `UnlockSheet` with Dahlia's intro and "Continue without" | unlock 1.1.0, unlock-ui 1.1.0 (reference app for the billing test matrix, QA-5) |
-| Lazy Moves | `plus_unlock` | `plus` / `unlocked` | debug build with the `pref_debug_simulate_plus` setting | `UnlockPanel` in the Plus card of Settings | unlock 1.1.0, unlock-ui 1.1.0 (checks only) |
-| Weatherfold | `pro` | `pro` / `unlocked` | debug build unless the `debug_free` preference is set | own `ProScreen` (sky palette, no `MaterialTheme`) over `AppUnlock` | unlock 1.1.0 (checks only) |
-| Paperboat | `pro` | `pro` / `unlocked` | debug build (`FLAG_DEBUGGABLE`) | `UnlockSheet` from a Pro row in Settings; not released yet | unlock 1.1.0, unlock-ui 1.1.0 (checks only) |
+| Dahlia | `pro` | `pro` / `owned` | resource `pro_for_testing` (debug and fast builds); the `free` build counts as not Pro | `UnlockSheet` with Dahlia's intro and "Continue without" | unlock 1.1.1, unlock-ui 1.1.1 (reference app for the billing test matrix, QA-5) |
+| Lazy Moves | `plus_unlock` | `plus` / `unlocked` | debug build with the `pref_debug_simulate_plus` setting | `UnlockPanel` in the Plus card of Settings | unlock 1.1.1, unlock-ui 1.1.1 (checks only) |
+| Weatherfold | `pro` | `pro` / `unlocked` | debug build unless the `debug_free` preference is set | own `ProScreen` (sky palette, no `MaterialTheme`) over `AppUnlock` | unlock 1.1.1 (checks only) |
+| Paperboat | `pro` | `pro` / `unlocked` | debug build (`FLAG_DEBUGGABLE`) | `UnlockSheet` from a Pro row in Settings; not released yet | unlock 1.1.1, unlock-ui 1.1.1 (checks only) |
 
 Since 6 November 2026 all four apps and the Cockpit template run their guardrail tests on `testing`
 (Lazy Moves with a counted baseline for raw sizes).
