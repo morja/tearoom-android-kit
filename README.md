@@ -72,9 +72,10 @@ holder (`Pro`/`Plus` object) that maps `UnlockMessage` and `PriceProblem` to its
 
 | App | Product | Prefs (name/key) | Debug unlock |
 |---|---|---|---|
-| Dahlia | `pro` | `pro` / `owned` | resource `pro_for_testing` (debug and fast builds) |
+| Dahlia | `pro` | `pro` / `owned` | resource `pro_for_testing` (debug and fast builds); the `free` build counts as not Pro |
 | Lazy Moves | `plus_unlock` | `plus` / `unlocked` | debug build with the `pref_debug_simulate_plus` setting |
 | Weatherfold | `pro` | `pro` / `unlocked` | debug build unless the `debug_free` preference is set |
+| Paperboat | planned: clipboard sync as Pro (Paperboat ADR-0005), own `Entitlements` until it moves here | – | – |
 
 ## Checks
 

@@ -5,7 +5,8 @@ Status: accepted, 26 October 2026 (user decision, Mathis).
 ## Decision
 
 - Shared Android code for the tearoom.one apps lives in this repository,
-  `~/Work/Projects/apps/tearoom-android-kit`, local only for now (no remote, no published artifact).
+  `~/Work/Projects/apps/tearoom-android-kit`, public at github.com/morja/tearoom-android-kit under
+  Apache-2.0 since 27 October 2026 (no published artifact; before that local only).
 - Apps include it with `includeBuild(...)` in their `settings.gradle.kts` and depend on Maven-style
   coordinates such as `one.tearoom:unlock:1.0.0`; Gradle substitutes the included project.
 - The path comes from the Gradle property `tearoomKitPath` (for example in
