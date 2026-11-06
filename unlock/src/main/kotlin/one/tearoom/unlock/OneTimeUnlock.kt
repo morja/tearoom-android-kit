@@ -48,6 +48,12 @@ class OneTimeUnlock internal constructor(
     }
 
     private fun withSession(action: (PlayBillingSession) -> Unit) = onMain {
+        // The app's debug unlock may have changed since the last answer (a developer switch); every
+        // refresh, restore or purchase reads it again, so the state never says "unlocked" from memory alone.
+        mutableState.value.let { s ->
+            val unlocked = s.purchased || config.debugUnlocked(app)
+            if (unlocked != s.unlocked) mutableState.value = s.copy(unlocked = unlocked)
+        }
         val current = session ?: PlayBillingSession(app, this, mutableState, handler, createClient).also { session = it }
         action(current)
     }

@@ -79,6 +79,23 @@ class AppUnlockTest {
         assertFalse(pro.state(context).value.purchased)
     }
 
+    @Test fun `a changed debug unlock is seen on the next refresh, even when Play does not answer`() {
+        var simulated = true
+        every { billing.queryPurchasesAsync(any(), any()) } answers {
+            secondArg<PurchasesResponseListener>().onQueryPurchasesResponse(
+                BillingResult.newBuilder().setResponseCode(BillingClient.BillingResponseCode.SERVICE_DISCONNECTED).build(), emptyList())
+        }
+        val pro = holder(UnlockConfig(productId = "pro", prefsName = "pro", debugUnlocked = { simulated }))
+        assertTrue(pro.state(context).value.unlocked)
+
+        simulated = false
+        pro.refresh(context)
+        idle()
+
+        assertFalse(pro.state(context).value.unlocked)
+        assertFalse(pro.isUnlocked(context))
+    }
+
     @Test fun `messages gives each feedback once, repeats included once cleared`() {
         val pro = holder()
         val seen = mutableListOf<UnlockMessage>()
