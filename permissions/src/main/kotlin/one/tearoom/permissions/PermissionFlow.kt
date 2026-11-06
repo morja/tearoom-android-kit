@@ -15,9 +15,6 @@ interface PermissionPlatform {
     /** Android would explain the permission: it asked once and was refused. */
     fun showsRationale(permission: String): Boolean
 
-    /** A monotonic clock in milliseconds. */
-    fun now(): Long
-
     /** This install saw a request for [stage] answered without a dialog; the mark outlives the process. */
     fun isMarkedBlocked(stage: PermissionKind): Boolean
     fun markBlocked(stage: PermissionKind, blocked: Boolean)
@@ -43,7 +40,7 @@ interface PermissionPlatform {
  * dead button; a grant or a new rationale clears it.
  *
  * Get one from [AppPermission.request] (activity) or the kit's `rememberPermissionFlow` (Compose),
- * which also call [refresh] on every resume and feed [onAnswer].
+ * which also call [refresh] on every resume, [paused] on every pause and feed [onAnswer].
  */
 class PermissionFlow(
     val permission: AppPermission,
@@ -59,8 +56,10 @@ class PermissionFlow(
     /** The texts of the step being asked for now. */
     val texts: PermissionTexts get() = permission.textsFor(_state.value.stage)
 
-    private var askedAt = 0L
     private var rationaleBefore = false
+
+    /** The activity paused since the request went out: a dialog or page stood in front of it. */
+    private var dialogShown = false
 
     /** The step a dialog or settings page is open for; null while nothing is open. */
     private var open: PermissionKind? = null
@@ -115,6 +114,11 @@ class PermissionFlow(
         _state.value = if (current.usable) current.copy(ask = null) else current
     }
 
+    /** The activity paused: a system dialog or page came in front of it. From the binding, on every pause. */
+    fun paused() {
+        if (open != null) dialogShown = true
+    }
+
     /** The system's answer to [PermissionPlatform.launch]. */
     fun onAnswer(result: Map<String, Boolean>) {
         val answered = open
@@ -124,7 +128,7 @@ class PermissionFlow(
             val rationaleAfter = answered.permissions(platform.sdk).any(platform::showsRationale)
             val usableNow = PermissionPolicy.usable(answered, granted, platform.sdk)
             // A silent answer sets the mark; a dialog that was shown, however it ended, clears a stale one.
-            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, platform.now() - askedAt)
+            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, dialogShown)
             platform.markBlocked(answered, silent)
             if (silent) blockedSeen += answered else blockedSeen -= answered
         }
@@ -146,8 +150,8 @@ class PermissionFlow(
 
     private fun launch(current: PermissionState) {
         val wanted = current.stage.permissions(platform.sdk)
-        askedAt = platform.now()
         rationaleBefore = wanted.any(platform::showsRationale)
+        dialogShown = false
         open = current.stage
         _state.value = current.copy(ask = null, busy = true)
         platform.launch(wanted)

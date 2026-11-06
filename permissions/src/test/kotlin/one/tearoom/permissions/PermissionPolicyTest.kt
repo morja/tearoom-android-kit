@@ -56,17 +56,17 @@ class PermissionPolicyTest {
         assertEquals(PermissionStatus.GRANTED, PermissionPolicy.status(background, setOf(ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION), emptySet(), false, 34))
     }
 
-    @Test fun `an answer without a dialog, the second refusal, or a silent one`() {
-        // The second "Don't allow": Android explained before, not after.
-        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = true, rationaleAfter = false, elapsedMillis = 3000))
-        // A later process, blocked before: nothing explained, the answer comes at once.
-        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, elapsedMillis = 400))
+    @Test fun `an answer without a dialog, the second refusal, or one the activity never paused for`() {
+        // The second "Don't allow": Android explained before, not after; the dialog was shown.
+        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = true, rationaleAfter = false, dialogShown = true))
+        // A later process, blocked before: nothing explained, no dialog came.
+        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = false))
         // The first refusal: Android explains from now on.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = true, elapsedMillis = 400))
-        // A dialog dismissed slowly without an answer: not blocked, Android asks again.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, elapsedMillis = 2500))
-        // A grant is never blocked, however fast.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = true, rationaleBefore = true, rationaleAfter = false, elapsedMillis = 10))
+        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = true, dialogShown = true))
+        // A dialog dismissed without an answer: not blocked, Android asks again.
+        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = true))
+        // A grant is never blocked.
+        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = true, rationaleBefore = true, rationaleAfter = false, dialogShown = false))
     }
 
     @Test fun `what a tap on the feature does`() {

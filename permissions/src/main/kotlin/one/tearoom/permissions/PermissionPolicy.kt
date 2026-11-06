@@ -5,9 +5,6 @@ package one.tearoom.permissions
  * (AGENTS.md rule 6). [PermissionFlow] reads the system and applies them.
  */
 object PermissionPolicy {
-    /** A request that Android answered faster than this showed no dialog: the permission is blocked. */
-    const val SILENT_ANSWER_MILLIS = 1000L
-
     /** What a tap on the feature does. */
     enum class Move {
         /** Usable: run the feature. */
@@ -58,12 +55,12 @@ object PermissionPolicy {
      * Android answered a request without showing anything, so the permission is blocked. After the
      * second refusal Android stops explaining ([rationaleAfter] false) although it did before
      * ([rationaleBefore] true). In a later process, or after "Don't allow" in the settings, nothing
-     * was ever explained: then the silent answer shows in its speed, under a second, where a person
-     * needs longer to read a dialog (Weatherfold QA on the emulator, 5 November 2026: 400 ms was too
-     * short for a slow phone).
+     * was ever explained: then the only sign is that no dialog came, which the flow sees as the
+     * activity never pausing between the request and the answer ([dialogShown] false). A clock is no
+     * measure: a silent answer took 1.4 s on a cold start of Paperboat (QA-2, 6 November 2026).
      */
-    fun answeredWithoutDialog(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, elapsedMillis: Long): Boolean =
-        !usableNow && !rationaleAfter && (rationaleBefore || elapsedMillis < SILENT_ANSWER_MILLIS)
+    fun answeredWithoutDialog(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, dialogShown: Boolean): Boolean =
+        !usableNow && !rationaleAfter && (rationaleBefore || !dialogShown)
 
     /**
      * What a tap on the feature does for [status]. A partial grant that is enough is done: the app
@@ -73,7 +70,7 @@ object PermissionPolicy {
      * Blocked goes to the settings only when this process saw the silent answer itself
      * ([blockedSeen]). A mark from an earlier process may be stale (Android resets unused apps, a
      * tester clears the flags), so the tap asks Android once more: a dialog proves the mark wrong,
-     * a silent answer confirms it within a second and the settings path follows.
+     * a silent answer confirms it and the settings path follows.
      */
     fun onStart(status: PermissionStatus, partialUsable: Boolean, explain: Explain, blockedSeen: Boolean = true): Move = when (status) {
         PermissionStatus.GRANTED, PermissionStatus.NOT_NEEDED -> Move.DONE

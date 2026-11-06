@@ -23,8 +23,10 @@ Status: accepted, 6 November 2026 (user decision, Mathis: every permission kind 
   a dead button. A grant or a new rationale clears it.
 - Blocked is read from Android, not guessed from the user: after the second refusal Android stops
   explaining the permission (`shouldShowRequestPermissionRationale` true before the request, false
-  after); where it never explained (a later process, "Don't allow" in the settings) a silent answer
-  shows in its speed, under a second (Weatherfold's measurement, 5 November 2026).
+  after); where it never explained (a later process, "Don't allow" in the settings) the sign is that
+  no dialog came: the activity never paused between the request and the answer. A clock is no
+  measure (Weatherfold used one second; a silent answer took 1.4 s on a cold start of Paperboat,
+  QA-2, 6 November 2026).
 - The reason comes first: the kit asks for its reason sheet before the first dialog and after a
   refusal (`Explain.SHEET`), or the screen that starts the feature carries the reason and the dialog
   opens at once (`Explain.SCREEN`, Weatherfold's welcome and disclosure pages). In both modes a

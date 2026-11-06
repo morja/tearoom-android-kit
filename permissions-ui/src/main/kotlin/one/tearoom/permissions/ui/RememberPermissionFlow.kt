@@ -21,8 +21,8 @@ import one.tearoom.permissions.PermissionState
 
 /**
  * The flow of [permission] for the screen this is called from: the system dialog through an Activity
- * Result launcher of the composition, a refresh on every resume, and the open reason or settings
- * path kept across a rotation. [onResult] runs once per answer, granted or not, and at once when the
+ * Result launcher of the composition, a refresh on every resume, the pause that tells a dialog from
+ * a silent answer, and the open reason or settings path kept across a rotation. [onResult] runs once per answer, granted or not, and at once when the
  * feature is started while the permission is already usable, so the feature runs from one place.
  *
  * ```kotlin
@@ -50,5 +50,6 @@ fun rememberPermissionFlow(permission: AppPermission, onResult: (PermissionState
     }
     LaunchedEffect(flow) { flow.state.collect { savedAsk = it.ask?.name } }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { flow.refresh() }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { flow.paused() }
     return flow
 }

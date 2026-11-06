@@ -10,7 +10,6 @@ import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultRegistry
@@ -29,8 +28,6 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
     override fun isGranted(permission: String) = activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
     override fun showsRationale(permission: String) = activity.shouldShowRequestPermissionRationale(permission)
-
-    override fun now() = SystemClock.elapsedRealtime()
 
     private val marks get() = activity.getSharedPreferences(MARKS, Context.MODE_PRIVATE)
 
@@ -136,7 +133,8 @@ object PermissionSettings {
 
 /**
  * The flow for an activity, with the Activity Result launcher registered in [registry] (register
- * before the activity starts) and [PermissionFlow.refresh] on every resume.
+ * before the activity starts), [PermissionFlow.refresh] on every resume and [PermissionFlow.paused]
+ * on every pause.
  */
 internal fun AppPermission.activityFlow(
     activity: ComponentActivity,
@@ -149,7 +147,15 @@ internal fun AppPermission.activityFlow(
     }
     val created = PermissionFlow(this, ActivityPlatform(activity) { launcher.launch(it.toTypedArray()) }, onResult = onResult)
     flow = created
-    activity.lifecycle.addObserver(LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) created.refresh() })
+    activity.lifecycle.addObserver(
+        LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> created.refresh()
+                Lifecycle.Event.ON_PAUSE -> created.paused()
+                else -> Unit
+            }
+        },
+    )
     return created
 }
 

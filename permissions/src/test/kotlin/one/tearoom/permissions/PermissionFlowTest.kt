@@ -82,7 +82,7 @@ class PermissionFlowTest {
         flow.start()
         flow.proceed()
         device.rationale += CAMERA
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
 
         assertEquals(PermissionStatus.DENIED, flow.state.value.status)
         assertNull(flow.state.value.ask)
@@ -97,12 +97,12 @@ class PermissionFlowTest {
         val flow = flow(cameraOnScreen)
         flow.start()
         device.rationale += CAMERA
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.DENIED, flow.state.value.status)
 
         flow.start()
         device.rationale -= CAMERA
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
         assertTrue(device.marked(PermissionKind.Camera))
@@ -114,7 +114,7 @@ class PermissionFlowTest {
         assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
         next.start()
         assertEquals(listOf(CAMERA), device.launched)
-        device.answer(next, after = 200)
+        device.answer(next, dialog = false)
         assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, next.state.value.ask)
 
@@ -133,33 +133,33 @@ class PermissionFlowTest {
 
         flow.start()
         assertEquals(listOf(CAMERA), device.launched)
-        // A dialog stood for a while and was refused once: Android explains from now on.
+        // A dialog stood and was refused once: Android explains from now on.
         device.rationale += CAMERA
-        device.answer(flow, after = 4000)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.DENIED, flow.state.value.status)
         assertFalse(device.marked(PermissionKind.Camera))
 
-        // Dismissed slowly without an answer, with the mark still there: the dialog was shown, the mark goes.
+        // Dismissed without an answer, with the mark still there: the dialog was shown, the mark goes.
         device.mark(PermissionKind.Camera)
         device.rationale -= CAMERA
         flow.start()
-        device.answer(flow, after = 4000)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
         assertFalse(device.marked(PermissionKind.Camera))
     }
 
-    @Test fun `blocked in the settings, the silent answer shows in its speed`() {
+    @Test fun `blocked in the settings, no dialog comes and the activity never pauses`() {
         val flow = flow(cameraOnScreen)
         flow.start()
-        device.answer(flow, after = 300)
+        device.answer(flow, dialog = false)
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
     }
 
-    @Test fun `a dialog dismissed slowly without an answer is not blocked`() {
+    @Test fun `a dialog dismissed without an answer is not blocked`() {
         val flow = flow(cameraOnScreen)
         flow.start()
-        device.answer(flow, after = 2500)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
         assertNull(flow.state.value.ask)
         assertFalse(device.marked(PermissionKind.Camera))
@@ -168,7 +168,7 @@ class PermissionFlowTest {
     @Test fun `from the settings, a grant finishes, a refusal leaves the line on the screen`() {
         val flow = flow(cameraOnScreen)
         flow.start()
-        device.answer(flow, after = 200)
+        device.answer(flow, dialog = false)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
 
         flow.openSettings()
@@ -210,7 +210,7 @@ class PermissionFlowTest {
         flow.start()
         assertEquals(listOf(ACCESS_COARSE_LOCATION), device.launched)
         device.grant(ACCESS_COARSE_LOCATION)
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
 
         // No tap in between: the background request follows at once.
         assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), device.launched)
@@ -219,7 +219,7 @@ class PermissionFlowTest {
         assertTrue(results.isEmpty())
 
         device.grant(ACCESS_BACKGROUND_LOCATION)
-        device.answer(flow, after = 5000)
+        device.answer(flow, dialog = true)
         assertTrue(flow.state.value.usable)
         assertTrue(results.single().usable)
     }
@@ -231,7 +231,7 @@ class PermissionFlowTest {
         assertEquals(PermissionAsk.REASON, flow.state.value.ask)
         flow.proceed()
         device.grant(ACCESS_COARSE_LOCATION)
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
 
         assertEquals(PermissionAsk.REASON, flow.state.value.ask)
         assertEquals(PermissionKind.BackgroundLocation(), flow.state.value.stage)
@@ -246,7 +246,7 @@ class PermissionFlowTest {
         assertEquals(PermissionKind.BackgroundLocation(), flow.state.value.stage)
         flow.start()
         assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), device.launched)
-        device.answer(flow, after = 200)
+        device.answer(flow, dialog = false)
 
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
@@ -258,7 +258,7 @@ class PermissionFlowTest {
         val flow = flow(widgets)
         flow.start()
         device.rationale += ACCESS_COARSE_LOCATION
-        device.answer(flow, after = 3000)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionKind.Location(), flow.state.value.stage)
         assertEquals(PermissionStatus.DENIED, flow.state.value.status)
         assertEquals(listOf(ACCESS_COARSE_LOCATION), device.launched)
@@ -299,7 +299,7 @@ class PermissionFlowTest {
         assertFalse(flow.state.value.usable)
         flow.start()
         assertEquals(listOf(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION), device.launched)
-        device.answer(flow, after = 200)
+        device.answer(flow, dialog = false)
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
     }
@@ -367,7 +367,6 @@ class PermissionFlowTest {
         private val granted = mutableSetOf<String>()
         val rationale = mutableSetOf<String>()
         private val marks = mutableSetOf<String>()
-        private var clock = 10_000L
         var launched: List<String>? = null
         var settingsOpenedFor: PermissionKind? = null
 
@@ -376,15 +375,14 @@ class PermissionFlowTest {
         fun mark(stage: PermissionKind) = marks.add(stage.permissions(sdk).first())
         fun marked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
 
-        /** The system answers the open request after [after] milliseconds with the grants as they stand. */
-        fun answer(flow: PermissionFlow, after: Long = 3000) {
-            clock += after
+        /** The system answers the open request with the grants as they stand; [dialog] says whether one stood in front of the activity. */
+        fun answer(flow: PermissionFlow, dialog: Boolean = true) {
+            if (dialog) flow.paused()
             flow.onAnswer(launched.orEmpty().associateWith { it in granted })
         }
 
         override fun isGranted(permission: String) = permission in granted
         override fun showsRationale(permission: String) = permission in rationale
-        override fun now() = clock
         override fun isMarkedBlocked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
         override fun markBlocked(stage: PermissionKind, blocked: Boolean) {
             val key = stage.permissions(sdk).firstOrNull() ?: return
