@@ -4,7 +4,7 @@ plugins {
 
 // Apps depend on "one.tearoom:unlock"; the composite build substitutes this project (ADR-0001).
 group = "one.tearoom"
-version = "1.0.0"
+version = "1.1.0"
 
 android {
     namespace = "one.tearoom.unlock"
@@ -29,6 +29,13 @@ dependencies {
     // Plain billing: the library uses callbacks, not the Kotlin extensions of billing-ktx.
     implementation("com.android.billingclient:billing:9.1.0")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    // @StringRes on UnlockTexts; the apps have it anyway.
+    api("androidx.annotation:annotation:1.9.1")
+    constraints {
+        // Billing's Play Services pull in fragment 1.1.0, which Play Console flags as outdated; the
+        // constraint reaches every app through this module (before, Dahlia carried it alone).
+        implementation("androidx.fragment:fragment:1.9.1")
+    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
