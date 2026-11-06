@@ -69,11 +69,16 @@ object PermissionPolicy {
      * What a tap on the feature does for [status]. A partial grant that is enough is done: the app
      * never asks for precise in a loop. A partial grant that is not enough is asked for once more;
      * Android shows its upgrade dialog or answers at once, and the latter marks it blocked.
+     *
+     * Blocked goes to the settings only when this process saw the silent answer itself
+     * ([blockedSeen]). A mark from an earlier process may be stale (Android resets unused apps, a
+     * tester clears the flags), so the tap asks Android once more: a dialog proves the mark wrong,
+     * a silent answer confirms it within a second and the settings path follows.
      */
-    fun onStart(status: PermissionStatus, partialUsable: Boolean, explain: Explain): Move = when (status) {
+    fun onStart(status: PermissionStatus, partialUsable: Boolean, explain: Explain, blockedSeen: Boolean = true): Move = when (status) {
         PermissionStatus.GRANTED, PermissionStatus.NOT_NEEDED -> Move.DONE
         PermissionStatus.PARTIAL -> if (partialUsable) Move.DONE else Move.LAUNCH
         PermissionStatus.NOT_ASKED, PermissionStatus.DENIED -> if (explain == Explain.SHEET) Move.EXPLAIN else Move.LAUNCH
-        PermissionStatus.BLOCKED -> Move.SETTINGS
+        PermissionStatus.BLOCKED -> if (blockedSeen) Move.SETTINGS else Move.LAUNCH
     }
 }

@@ -102,13 +102,28 @@ object PermissionSettings {
         }.getOrDefault(label)
     }
 
+    /**
+     * The label of the permission group, as Android's settings list it ("Location", "Notifications").
+     * `PermissionInfo.group` reports UNDEFINED for platform permissions since Android 10, so the group
+     * is named here per kind; the label comes from the framework in the app's language.
+     */
     private fun groupLabel(context: Context, stage: PermissionKind): String {
+        val sdk = Build.VERSION.SDK_INT
+        val group = when (stage) {
+            is PermissionKind.Location, is PermissionKind.BackgroundLocation -> "LOCATION"
+            PermissionKind.Notifications -> "NOTIFICATIONS"
+            PermissionKind.Camera -> "CAMERA"
+            PermissionKind.Microphone -> "MICROPHONE"
+            PermissionKind.PhysicalActivity -> "ACTIVITY_RECOGNITION"
+            is PermissionKind.NearbyDevices -> if (sdk >= 31) "NEARBY_DEVICES" else "LOCATION"
+            is PermissionKind.Media -> when {
+                sdk < 33 -> "STORAGE"
+                stage.images || stage.video -> "READ_MEDIA_VISUAL"
+                else -> "READ_MEDIA_AURAL"
+            }
+        }
         val pm = context.packageManager
-        val permission = stage.permissions(Build.VERSION.SDK_INT).firstOrNull() ?: return ""
-        return runCatching {
-            val group = pm.getPermissionInfo(permission, 0).group ?: return ""
-            pm.getPermissionGroupInfo(group, 0).loadLabel(pm).toString()
-        }.getOrDefault("")
+        return runCatching { pm.getPermissionGroupInfo("android.permission-group.$group", 0).loadLabel(pm).toString() }.getOrDefault("")
     }
 
     private fun systemLocales(context: Context): LocaleList {

@@ -78,6 +78,8 @@ class PermissionPolicyTest {
         assertEquals(Move.LAUNCH, PermissionPolicy.onStart(PermissionStatus.DENIED, true, Explain.SCREEN))
         assertEquals(Move.SETTINGS, PermissionPolicy.onStart(PermissionStatus.BLOCKED, true, Explain.SHEET))
         assertEquals(Move.SETTINGS, PermissionPolicy.onStart(PermissionStatus.BLOCKED, true, Explain.SCREEN))
+        // A mark from an earlier process is tried once more: Android proves or confirms it.
+        assertEquals(Move.LAUNCH, PermissionPolicy.onStart(PermissionStatus.BLOCKED, true, Explain.SHEET, blockedSeen = false))
         // Approximate where precise is enough: done, never asked for in a loop; where it is required, once more.
         assertEquals(Move.DONE, PermissionPolicy.onStart(PermissionStatus.PARTIAL, true, Explain.SHEET))
         assertEquals(Move.LAUNCH, PermissionPolicy.onStart(PermissionStatus.PARTIAL, false, Explain.SHEET))

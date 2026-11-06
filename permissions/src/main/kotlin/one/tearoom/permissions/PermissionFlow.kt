@@ -66,11 +66,14 @@ class PermissionFlow(
     private var open: PermissionKind? = null
     private var inSettings = false
 
+    /** The steps whose silent answer this process saw itself; a mark from before is tried once more. */
+    private val blockedSeen = mutableSetOf<PermissionKind>()
+
     /** The user started the feature. Usable: [onResult] runs at once. Otherwise the reason, the dialog or the settings path. */
     fun start() {
         val current = read()
         if (current.busy) return
-        move(current, PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain))
+        move(current, PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.stage in blockedSeen))
     }
 
     /** From the reason: on to the system dialog. Also for a control whose line already says why. */
@@ -120,9 +123,10 @@ class PermissionFlow(
             val granted = permission.granted(platform)
             val rationaleAfter = answered.permissions(platform.sdk).any(platform::showsRationale)
             val usableNow = PermissionPolicy.usable(answered, granted, platform.sdk)
-            if (PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, platform.now() - askedAt)) {
-                platform.markBlocked(answered, true)
-            }
+            // A silent answer sets the mark; a dialog that was shown, however it ended, clears a stale one.
+            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, platform.now() - askedAt)
+            platform.markBlocked(answered, silent)
+            if (silent) blockedSeen += answered else blockedSeen -= answered
         }
         // Without an open step (the screen was rebuilt while the dialog stood) the answer still counts.
         continueOrFinish(answered, read(busy = false), fromSettings = false)
@@ -161,7 +165,7 @@ class PermissionFlow(
         }
         if (answered != null && current.stage != answered) {
             // The first step came through: the next follows from the same tap, with the reason first where the app wants it.
-            val next = PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain)
+            val next = PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.stage in blockedSeen)
             move(current, next)
             if (next == PermissionPolicy.Move.SETTINGS) onResult(_state.value)
             return

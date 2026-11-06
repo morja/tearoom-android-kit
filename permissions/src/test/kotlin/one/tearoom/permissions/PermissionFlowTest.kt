@@ -108,13 +108,44 @@ class PermissionFlowTest {
         assertTrue(device.marked(PermissionKind.Camera))
         assertEquals(2, results.size)
 
-        // The next process remembers: the settings path, no launch.
+        // The next process remembers the line, but the tap asks Android once more; the silent answer confirms it.
         device.launched = null
         val next = flow(cameraOnScreen)
         assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
         next.start()
+        assertEquals(listOf(CAMERA), device.launched)
+        device.answer(next, after = 200)
+        assertEquals(PermissionStatus.BLOCKED, next.state.value.status)
+        assertEquals(PermissionAsk.SETTINGS, next.state.value.ask)
+
+        // Seen in this process: straight to the settings path.
+        device.launched = null
+        next.dismiss()
+        next.start()
         assertNull(device.launched)
         assertEquals(PermissionAsk.SETTINGS, next.state.value.ask)
+    }
+
+    @Test fun `a stale mark, Android asks again and the dialog clears it`() {
+        device.mark(PermissionKind.Camera)
+        val flow = flow(cameraOnScreen)
+        assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
+
+        flow.start()
+        assertEquals(listOf(CAMERA), device.launched)
+        // A dialog stood for a while and was refused once: Android explains from now on.
+        device.rationale += CAMERA
+        device.answer(flow, after = 4000)
+        assertEquals(PermissionStatus.DENIED, flow.state.value.status)
+        assertFalse(device.marked(PermissionKind.Camera))
+
+        // Dismissed slowly without an answer, with the mark still there: the dialog was shown, the mark goes.
+        device.mark(PermissionKind.Camera)
+        device.rationale -= CAMERA
+        flow.start()
+        device.answer(flow, after = 4000)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertFalse(device.marked(PermissionKind.Camera))
     }
 
     @Test fun `blocked in the settings, the silent answer shows in its speed`() {
@@ -135,9 +166,9 @@ class PermissionFlowTest {
     }
 
     @Test fun `from the settings, a grant finishes, a refusal leaves the line on the screen`() {
-        device.mark(PermissionKind.Camera)
-        val flow = flow(camera)
+        val flow = flow(cameraOnScreen)
         flow.start()
+        device.answer(flow, after = 200)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
 
         flow.openSettings()
@@ -147,7 +178,9 @@ class PermissionFlowTest {
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertNull(flow.state.value.ask)
         assertFalse(flow.state.value.busy)
-        assertFalse(results.single().usable)
+        // The silent answer and the return from the settings are two answers.
+        assertEquals(2, results.size)
+        assertFalse(results.last().usable)
 
         flow.openSettings()
         device.grant(CAMERA)
