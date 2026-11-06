@@ -439,6 +439,20 @@ class OneTimeUnlockTest {
         assertEquals(PriceProblem.PRODUCT_UNAVAILABLE, state.value.priceProblem)
     }
 
+    @Test fun `restore while a payment is pending reports pending, not "not found"`() {
+        val pending = purchase()
+        every { pending.purchaseState } returns Purchase.PurchaseState.PENDING
+        every { billing.queryPurchasesAsync(any(), any()) } answers {
+            secondArg<PurchasesResponseListener>().onQueryPurchasesResponse(result(), listOf(pending))
+        }
+
+        session.restore()
+
+        assertTrue(state.value.pending)
+        assertFalse(state.value.unlocked)
+        assertEquals(UnlockMessage.PENDING, state.value.message)
+    }
+
     @Test fun `restore without a purchase reports not found`() {
         session.restore()
 

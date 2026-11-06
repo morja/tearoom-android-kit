@@ -241,6 +241,8 @@ internal class PlayBillingSession(
         state.value = state.value.copy(message = when {
             !ok -> UnlockMessage.PLAY_UNREACHABLE
             cached() -> UnlockMessage.ACTIVE_HERE
+            // A payment still pending is not "no purchase": say so instead (REV-3 finding 2).
+            state.value.pending -> UnlockMessage.PENDING
             else -> UnlockMessage.NOT_FOUND
         })
     }
