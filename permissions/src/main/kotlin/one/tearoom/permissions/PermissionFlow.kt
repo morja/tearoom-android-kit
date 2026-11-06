@@ -15,6 +15,9 @@ interface PermissionPlatform {
     /** Android would explain the permission: it asked once and was refused. */
     fun showsRationale(permission: String): Boolean
 
+    /** A monotonic clock in milliseconds. */
+    fun now(): Long
+
     /** This install saw a request for [stage] answered without a dialog; the mark outlives the process. */
     fun isMarkedBlocked(stage: PermissionKind): Boolean
     fun markBlocked(stage: PermissionKind, blocked: Boolean)
@@ -60,6 +63,7 @@ class PermissionFlow(
     val texts: PermissionTexts get() = permission.textsFor(_state.value.stage)
 
     private var rationaleBefore = false
+    private var askedAt = 0L
 
     /** The activity paused since the request went out: a dialog or page stood in front of it. */
     private var dialogShown = false
@@ -129,7 +133,7 @@ class PermissionFlow(
             val rationaleAfter = answered.permissions(platform.sdk).any(platform::showsRationale)
             val usableNow = PermissionPolicy.usable(answered, granted, platform.sdk)
             // A silent answer sets the mark; a dialog that was shown, however it ended, clears a stale one.
-            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, dialogShown)
+            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, dialogShown, platform.now() - askedAt)
             platform.markBlocked(answered, silent)
             if (silent) blockedSeen += answered else blockedSeen -= answered
         }
@@ -152,6 +156,7 @@ class PermissionFlow(
     private fun launch(current: PermissionState) {
         val wanted = current.stage.permissions(platform.sdk)
         rationaleBefore = wanted.any(platform::showsRationale)
+        askedAt = platform.now()
         dialogShown = false
         open = current.stage
         _state.value = current.copy(ask = null, busy = true)

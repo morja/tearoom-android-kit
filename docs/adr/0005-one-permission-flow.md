@@ -21,12 +21,13 @@ Status: accepted, 6 November 2026 (user decision, Mathis: every permission kind 
   app is left and nothing more. The one thing kept, in the kit's own preferences file, is a mark that
   Android answered a request without a dialog, so the next start shows the settings path instead of
   a dead button. A grant or a new rationale clears it.
-- Blocked is read from Android, not guessed from the user: after the second refusal Android stops
+- Blocked is read from Android, not guessed from the user, by three signs of which any one is enough
+  (Paperboat QA-2, 6 November 2026, after each alone failed): after the second refusal Android stops
   explaining the permission (`shouldShowRequestPermissionRationale` true before the request, false
-  after); where it never explained (a later process, "Don't allow" in the settings) the sign is that
-  no dialog came: the activity never paused between the request and the answer. A clock is no
-  measure (Weatherfold used one second; a silent answer took 1.4 s on a cold start of Paperboat,
-  QA-2, 6 November 2026).
+  after); no dialog came at all, the activity never paused; or the answer came within a second. A
+  fixed permission on Android 14 flashes the permission controller, so the activity may pause for a
+  silent answer, and a cold start can slow that answer past a second; a dialog dismissed with back
+  leaves no flag. A silent answer that slips through costs one tap: the next tap asks Android again.
 - The reason comes first: the kit asks for its reason sheet before the first dialog and after a
   refusal (`Explain.SHEET`), or the screen that starts the feature carries the reason and the dialog
   opens at once (`Explain.SCREEN`, Weatherfold's welcome and disclosure pages). In both modes a

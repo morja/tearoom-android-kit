@@ -155,9 +155,11 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
 - `start()` on the tap that starts the feature: usable, and `onResult` runs at once; otherwise the
   app's reason (`PermissionAsk.REASON`, or straight to the dialog with `Explain.SCREEN` where the
   screen says why), the system dialog, or the settings path (`PermissionAsk.SETTINGS`) once Android
-  answers without a dialog (the activity never paused for one). `proceed()` from the reason,
-  `openSettings()`, `dismiss()`; `refresh()` runs on every resume and `paused()` on every pause, both
-  from the bindings, so a grant or a revoke in the settings shows at once.
+  answers without a dialog (no rationale after one before, no pause of the activity, or an answer
+  within a second). `proceed()` from the reason, `openSettings()`, `dismiss()`; `refresh()` runs on
+  every resume and `paused()` on every pause, both from the bindings, so a grant or a revoke in the
+  settings shows at once. A block that only the kit's mark remembers (`PermissionState.confirmed`
+  false) is asked once more before the settings path is named.
 - `state` (`PermissionState`: `status`, `stage`, `ask`, `busy`, `usable`) is everything a surface
   shows; an app with a surface of its own reads it and calls the same methods. `status.textRes(texts)`
   gives the app's line for a status, `flow.texts` the texts of the step being asked for.

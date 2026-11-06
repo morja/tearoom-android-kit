@@ -10,6 +10,7 @@ import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultRegistry
@@ -28,6 +29,8 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
     override fun isGranted(permission: String) = activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
     override fun showsRationale(permission: String) = activity.shouldShowRequestPermissionRationale(permission)
+
+    override fun now() = SystemClock.elapsedRealtime()
 
     private val marks get() = activity.getSharedPreferences(MARKS, Context.MODE_PRIVATE)
 

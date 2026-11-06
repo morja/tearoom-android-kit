@@ -158,6 +158,14 @@ class PermissionFlowTest {
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
     }
 
+    @Test fun `blocked, the controller flashes by, the answer is quick`() {
+        val flow = flow(cameraOnScreen)
+        flow.start()
+        device.answer(flow, dialog = true, after = 300)
+        assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
+        assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+    }
+
     @Test fun `a dialog dismissed without an answer is not blocked`() {
         val flow = flow(cameraOnScreen)
         flow.start()
@@ -377,11 +385,19 @@ class PermissionFlowTest {
         fun mark(stage: PermissionKind) = marks.add(stage.permissions(sdk).first())
         fun marked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
 
-        /** The system answers the open request with the grants as they stand; [dialog] says whether one stood in front of the activity. */
-        fun answer(flow: PermissionFlow, dialog: Boolean = true) {
+        private var clock = 10_000L
+
+        /**
+         * The system answers the open request with the grants as they stand; [dialog] says whether one
+         * stood in front of the activity, [after] how long it took.
+         */
+        fun answer(flow: PermissionFlow, dialog: Boolean = true, after: Long = 3000) {
             if (dialog) flow.paused()
+            clock += after
             flow.onAnswer(launched.orEmpty().associateWith { it in granted })
         }
+
+        override fun now() = clock
 
         override fun isGranted(permission: String) = permission in granted
         override fun showsRationale(permission: String) = permission in rationale

@@ -52,15 +52,23 @@ object PermissionPolicy {
     }
 
     /**
-     * Android answered a request without showing anything, so the permission is blocked. After the
-     * second refusal Android stops explaining ([rationaleAfter] false) although it did before
-     * ([rationaleBefore] true). In a later process, or after "Don't allow" in the settings, nothing
-     * was ever explained: then the only sign is that no dialog came, which the flow sees as the
-     * activity never pausing between the request and the answer ([dialogShown] false). A clock is no
-     * measure: a silent answer took 1.4 s on a cold start of Paperboat (QA-2, 6 November 2026).
+     * A request that Android answered faster than this showed no dialog a person could have read.
+     * Weatherfold measured 400 ms as too short on a slow phone (5 November 2026).
      */
-    fun answeredWithoutDialog(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, dialogShown: Boolean): Boolean =
-        !usableNow && !rationaleAfter && (rationaleBefore || !dialogShown)
+    const val SILENT_ANSWER_MILLIS = 1000L
+
+    /**
+     * Android answered a request without showing anything, so the permission is blocked. Three signs,
+     * any one of them enough, because none holds alone (Paperboat QA-2, 6 November 2026): after the
+     * second refusal Android stops explaining ([rationaleAfter] false) although it did before
+     * ([rationaleBefore] true); no dialog came at all, the activity never paused ([dialogShown] false);
+     * or the answer came within [SILENT_ANSWER_MILLIS]. A fixed permission on Android 14 starts the
+     * permission controller for a moment, so the activity may pause for a silent answer, and a cold
+     * start can slow that answer past a second; a dialog dismissed with back leaves no flag at all.
+     * A silent answer that slips through is tried again on the next tap ([onStart]), so the cost is a tap.
+     */
+    fun answeredWithoutDialog(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, dialogShown: Boolean, elapsedMillis: Long): Boolean =
+        !usableNow && !rationaleAfter && (rationaleBefore || !dialogShown || elapsedMillis < SILENT_ANSWER_MILLIS)
 
     /**
      * What a tap on the feature does for [status]. A partial grant that is enough is done: the app
