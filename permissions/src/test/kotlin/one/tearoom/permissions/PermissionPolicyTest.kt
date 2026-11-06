@@ -5,6 +5,7 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.Manifest.permission.READ_MEDIA_IMAGES
 import android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+import one.tearoom.permissions.PermissionPolicy.Answer
 import one.tearoom.permissions.PermissionPolicy.Move
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,19 +57,26 @@ class PermissionPolicyTest {
         assertEquals(PermissionStatus.GRANTED, PermissionPolicy.status(background, setOf(ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION), emptySet(), false, 34))
     }
 
-    @Test fun `an answer without a dialog, the second refusal, no pause, or a quick one`() {
-        // The second "Don't allow": Android explained before, not after; the dialog was shown.
-        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = true, rationaleAfter = false, dialogShown = true, elapsedMillis = 3000))
-        // A later process, blocked before: nothing explained, the activity never paused.
-        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = false, elapsedMillis = 3000))
-        // Android 14 shows the controller for a moment even for a fixed permission: the answer is quick.
-        assertTrue(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = true, elapsedMillis = 300))
+    @Test fun `answers, a grant or a new rationale is a dialog, a lost rationale or no pause is silent, the rest unsure`() {
+        assertEquals(Answer.DIALOG, PermissionPolicy.answer(usableNow = true, rationaleBefore = true, rationaleAfter = false, dialogShown = false))
         // The first refusal: Android explains from now on.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = true, dialogShown = true, elapsedMillis = 300))
-        // A dialog dismissed with back after a while: no flag, not blocked, Android asks again.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = true, elapsedMillis = 2500))
-        // A grant is never blocked.
-        assertFalse(PermissionPolicy.answeredWithoutDialog(usableNow = true, rationaleBefore = true, rationaleAfter = false, dialogShown = false, elapsedMillis = 10))
+        assertEquals(Answer.DIALOG, PermissionPolicy.answer(usableNow = false, rationaleBefore = false, rationaleAfter = true, dialogShown = true))
+        // The second "Don't allow": Android explained before, not after.
+        assertEquals(Answer.SILENT, PermissionPolicy.answer(usableNow = false, rationaleBefore = true, rationaleAfter = false, dialogShown = true))
+        // No dialog at all: the activity never paused.
+        assertEquals(Answer.SILENT, PermissionPolicy.answer(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = false))
+        // A first dialog dismissed (quickly or not), or a blocked permission flashing the controller: unsure.
+        assertEquals(Answer.UNSURE, PermissionPolicy.answer(usableNow = false, rationaleBefore = false, rationaleAfter = false, dialogShown = true))
+    }
+
+    @Test fun `blocked, silent always, unsure only after a mark or a second unsure answer in a row`() {
+        assertFalse(PermissionPolicy.blocks(Answer.DIALOG, markedBefore = true, unsureBefore = true))
+        assertTrue(PermissionPolicy.blocks(Answer.SILENT, markedBefore = false, unsureBefore = false))
+        // REV-4 finding 3, first gap: a first dialog dismissed within a second is not blocked.
+        assertFalse(PermissionPolicy.blocks(Answer.UNSURE, markedBefore = false, unsureBefore = false))
+        // Second gap: a slow silent answer with a controller flash, the second time in a row, is.
+        assertTrue(PermissionPolicy.blocks(Answer.UNSURE, markedBefore = false, unsureBefore = true))
+        assertTrue(PermissionPolicy.blocks(Answer.UNSURE, markedBefore = true, unsureBefore = false))
     }
 
     @Test fun `what a tap on the feature does`() {

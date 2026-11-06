@@ -141,13 +141,13 @@ class PermissionFlowTest {
         assertEquals(PermissionStatus.DENIED, flow.state.value.status)
         assertFalse(device.marked(PermissionKind.Camera))
 
-        // Dismissed without an answer, with the mark still there: the dialog was shown, the mark goes.
+        // An unsure answer while the mark stands confirms it: the mark and the answer agree.
         device.mark(PermissionKind.Camera)
         device.rationale -= CAMERA
         flow.start()
         device.answer(flow, dialog = true)
-        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
-        assertFalse(device.marked(PermissionKind.Camera))
+        assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
+        assertTrue(flow.state.value.confirmed)
     }
 
     @Test fun `blocked in the settings, no dialog comes and the activity never pauses`() {
@@ -158,12 +158,41 @@ class PermissionFlowTest {
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
     }
 
-    @Test fun `blocked, the controller flashes by, the answer is quick`() {
+    @Test fun `a first dialog dismissed quickly is not blocked, Android asks again`() {
         val flow = flow(cameraOnScreen)
         flow.start()
-        device.answer(flow, dialog = true, after = 300)
+        device.answer(flow, dialog = true)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertNull(flow.state.value.ask)
+        assertFalse(device.marked(PermissionKind.Camera))
+    }
+
+    @Test fun `turned off in the settings before the first ask, a slow silent answer with a flash, blocked at the second`() {
+        val flow = flow(cameraOnScreen)
+        flow.start()
+        device.answer(flow, dialog = true)
+        assertNull(flow.state.value.ask)
+        assertEquals(1, results.size)
+
+        flow.start()
+        assertEquals(listOf(CAMERA), device.launched)
+        device.answer(flow, dialog = true)
         assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
         assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+        assertTrue(device.marked(PermissionKind.Camera))
+
+        // A dialog that was answered in between resets the count.
+        val other = flow(AppPermission(PermissionKind.Microphone, texts, explain = Explain.SCREEN))
+        other.start()
+        device.answer(other, dialog = true)
+        device.rationale += android.Manifest.permission.RECORD_AUDIO
+        other.start()
+        device.answer(other, dialog = true)
+        assertEquals(PermissionStatus.DENIED, other.state.value.status)
+        device.rationale -= android.Manifest.permission.RECORD_AUDIO
+        other.start()
+        device.answer(other, dialog = true)
+        assertEquals(PermissionStatus.NOT_ASKED, other.state.value.status)
     }
 
     @Test fun `a dialog dismissed without an answer is not blocked`() {
@@ -366,6 +395,137 @@ class PermissionFlowTest {
         assertNull(flow.state.value.ask)
     }
 
+    @Test fun `approximate allowed, precise refused, denied with the partial line, then blocked with the settings path`() {
+        val precise = AppPermission(PermissionKind.Location(Precision.PRECISE_REQUIRED), texts, explain = Explain.SCREEN)
+        device.grant(ACCESS_COARSE_LOCATION)
+        device.rationale += ACCESS_FINE_LOCATION
+        val flow = flow(precise)
+        assertEquals(PermissionStatus.DENIED, flow.state.value.status)
+        assertTrue(flow.state.value.partial)
+        assertFalse(flow.state.value.usable)
+        assertEquals(7, flow.state.value.textRes(flow.texts))
+
+        // The second refusal of precise: blocked, the settings path, approximate still granted.
+        flow.start()
+        device.rationale -= ACCESS_FINE_LOCATION
+        device.answer(flow, dialog = true)
+        assertEquals(PermissionStatus.BLOCKED, flow.state.value.status)
+        assertTrue(flow.state.value.partial)
+        assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+        assertEquals(3, flow.state.value.textRes(flow.texts))
+        flow.dismiss()
+        flow.start()
+        assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+    }
+
+    @Test fun `the settings option falls back to the app's text where Android names none`() {
+        val withOption = AppPermission(PermissionKind.BackgroundLocation(), backgroundTexts.copy(option = 42), first = location)
+        device.grant(ACCESS_COARSE_LOCATION)
+        val flow = flow(withOption)
+        assertEquals("Allow all the time", flow.settingsOption())
+        device.option = ""
+        assertEquals("text 42", flow.settingsOption())
+        assertEquals("", flow(widgets).settingsOption())
+    }
+
+    @Test fun `not now on the reason counts as an answer, once`() {
+        val flow = flow(camera)
+        flow.start()
+        flow.dismiss()
+        assertEquals(1, results.size)
+        assertFalse(results.single().usable)
+        // Nothing open: no second answer.
+        flow.dismiss()
+        assertEquals(1, results.size)
+    }
+
+    @Test fun `not now on a settings path the start opened counts, one shown after an answer does not count twice`() {
+        device.mark(PermissionKind.Camera)
+        val flow = flow(cameraOnScreen)
+        flow.start()
+        device.answer(flow, dialog = false)
+        assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+        assertEquals(1, results.size)
+        flow.dismiss()
+        assertEquals(1, results.size)
+
+        flow.start()
+        assertEquals(PermissionAsk.SETTINGS, flow.state.value.ask)
+        flow.dismiss()
+        assertEquals(2, results.size)
+    }
+
+    @Test fun `rotation during the foreground dialog, the answer continues the background step`() {
+        val first = flow(widgets)
+        first.start()
+        assertEquals(listOf(ACCESS_COARSE_LOCATION), device.launched)
+        first.paused()
+        val saved = first.save()
+
+        val rebuilt = flow(widgets)
+        rebuilt.restore(saved)
+        assertTrue(rebuilt.state.value.busy)
+        device.grant(ACCESS_COARSE_LOCATION)
+        device.answer(rebuilt)
+        assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), device.launched)
+        assertEquals(PermissionKind.BackgroundLocation(), rebuilt.state.value.stage)
+        assertTrue(results.isEmpty())
+    }
+
+    @Test fun `rotation during the background step, the answer finishes`() {
+        device.grant(ACCESS_COARSE_LOCATION)
+        val first = flow(widgets)
+        first.start()
+        assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), device.launched)
+        val saved = first.save()
+
+        val rebuilt = flow(widgets)
+        rebuilt.restore(saved)
+        device.grant(ACCESS_BACKGROUND_LOCATION)
+        device.answer(rebuilt)
+        assertTrue(rebuilt.state.value.usable)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `rotation while in the settings, the return still answers`() {
+        val flow = flow(cameraOnScreen)
+        flow.start()
+        device.answer(flow, dialog = false)
+        flow.openSettings()
+        val saved = flow.save()
+        results.clear()
+
+        val rebuilt = flow(cameraOnScreen)
+        rebuilt.restore(saved)
+        device.grant(CAMERA)
+        rebuilt.refresh()
+        assertTrue(rebuilt.state.value.usable)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `rotation keeps the reason sheet and the answers so far`() {
+        val flow = flow(cameraOnScreen)
+        flow.start()
+        device.answer(flow, dialog = true)
+        val saved = flow.save()
+
+        // The unsure answer before the rotation still counts: a second one blocks.
+        val rebuilt = flow(cameraOnScreen)
+        rebuilt.restore(saved)
+        rebuilt.start()
+        device.answer(rebuilt, dialog = true)
+        assertEquals(PermissionStatus.BLOCKED, rebuilt.state.value.status)
+
+        val microphone = AppPermission(PermissionKind.Microphone, texts)
+        val sheet = flow(microphone)
+        sheet.start()
+        val again = flow(microphone)
+        again.restore(sheet.save())
+        assertEquals(PermissionAsk.REASON, again.state.value.ask)
+        again.dismiss()
+        assertFalse(results.last().usable)
+    }
+
     private fun AppPermission.isUsableOn(platform: PermissionPlatform): Boolean {
         val granted = granted(platform)
         return PermissionPolicy.stage(kind, granted, platform.sdk) == kind && PermissionPolicy.usable(kind, granted, platform.sdk)
@@ -385,19 +545,14 @@ class PermissionFlowTest {
         fun mark(stage: PermissionKind) = marks.add(stage.permissions(sdk).first())
         fun marked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
 
-        private var clock = 10_000L
-
-        /**
-         * The system answers the open request with the grants as they stand; [dialog] says whether one
-         * stood in front of the activity, [after] how long it took.
-         */
-        fun answer(flow: PermissionFlow, dialog: Boolean = true, after: Long = 3000) {
+        /** The system answers the open request with the grants as they stand; [dialog] says whether something stood in front of the activity. */
+        fun answer(flow: PermissionFlow, dialog: Boolean = true) {
             if (dialog) flow.paused()
-            clock += after
             flow.onAnswer(launched.orEmpty().associateWith { it in granted })
         }
 
-        override fun now() = clock
+        /** What Android names as the option; empty like Android 10 for "Allow all the time". */
+        var option = "Allow all the time"
 
         override fun isGranted(permission: String) = permission in granted
         override fun showsRationale(permission: String) = permission in rationale
@@ -408,6 +563,7 @@ class PermissionFlowTest {
         }
         override fun launch(permissions: List<String>) { launched = permissions }
         override fun openSettings(stage: PermissionKind) { settingsOpenedFor = stage }
-        override fun settingsOption(stage: PermissionKind) = "Allow all the time"
+        override fun settingsOption(stage: PermissionKind) = option
+        override fun text(id: Int) = "text $id"
     }
 }

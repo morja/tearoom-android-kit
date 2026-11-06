@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import one.tearoom.permissions.PermissionFlow
 import one.tearoom.permissions.PermissionStatus
+import one.tearoom.permissions.textRes
 
 /**
  * The persistent line on a screen whose feature is on while its permission is missing (the skill:
@@ -27,23 +28,23 @@ import one.tearoom.permissions.PermissionStatus
 fun PermissionHint(flow: PermissionFlow, modifier: Modifier = Modifier, style: PermissionStyle = PermissionStyle()) {
     val state by flow.state.collectAsState()
     val texts = flow.texts
+    if (state.usable && !(state.status == PermissionStatus.PARTIAL && texts.partial != null)) return
     // A block only a mark remembers is offered like a refusal: "Allow" asks Android once more, which answers at once when it stands.
     val blocked = state.status == PermissionStatus.BLOCKED && state.confirmed
-    val settingsOnly = blocked || (state.status == PermissionStatus.PARTIAL && state.usable)
-    val text = when (state.status) {
-        PermissionStatus.NOT_ASKED -> stringResource(texts.reason)
-        PermissionStatus.DENIED -> stringResource(texts.denied)
-        PermissionStatus.BLOCKED -> if (blocked) stringResource(texts.blocked, flow.settingsOption()) else stringResource(texts.denied)
-        PermissionStatus.PARTIAL -> texts.partial?.let { stringResource(it) } ?: return
-        PermissionStatus.GRANTED, PermissionStatus.NOT_NEEDED -> return
+    val settingsOnly = blocked || state.usable
+    val line = when {
+        blocked -> texts.blocked
+        state.status == PermissionStatus.BLOCKED -> if (state.partial) texts.partial ?: texts.denied else texts.denied
+        else -> state.textRes(texts) ?: return
     }
+    val text = if (blocked) stringResource(line, flow.settingsOption()) else stringResource(line)
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(style.gap)) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (settingsOnly) {
-            TextButton(onClick = flow::openSettings) { Text(stringResource(texts.openSettings), maxLines = 1) }
+            TextButton(onClick = flow::openSettings) { Text(stringResource(texts.openSettings), maxLines = 2) }
         } else {
-            TextButton(onClick = flow::proceed, enabled = !state.busy) { Text(stringResource(texts.allow), maxLines = 1) }
+            TextButton(onClick = flow::proceed, enabled = !state.busy) { Text(stringResource(texts.allow), maxLines = 2) }
         }
     }
 }

@@ -1,12 +1,13 @@
 package one.tearoom.permissions
 
+import android.os.Bundle
+import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * What the flow needs from the device: the grants and rationales, a clock, the marks for blocked
- * permissions, the system dialog and the settings page. [ActivityPlatform] is the real one; a test
- * replaces it.
+ * What the flow needs from the device: the grants and rationales, the marks for blocked permissions,
+ * the system dialog and the settings page. [ActivityPlatform] is the real one; a test replaces it.
  */
 interface PermissionPlatform {
     val sdk: Int
@@ -14,9 +15,6 @@ interface PermissionPlatform {
 
     /** Android would explain the permission: it asked once and was refused. */
     fun showsRationale(permission: String): Boolean
-
-    /** A monotonic clock in milliseconds. */
-    fun now(): Long
 
     /** This install saw a request for [stage] answered without a dialog; the mark outlives the process. */
     fun isMarkedBlocked(stage: PermissionKind): Boolean
@@ -28,22 +26,28 @@ interface PermissionPlatform {
     /** Opens the page in Android's settings where [stage] is changed. */
     fun openSettings(stage: PermissionKind)
 
-    /** The option the settings path names, in the phone's language where Android provides it. */
+    /** The option the settings path names, in the phone's language where Android provides it; empty where it has none. */
     fun settingsOption(stage: PermissionKind): String
+
+    /** One of the app's strings, for the fallback of [settingsOption]. */
+    fun text(@StringRes id: Int): String
 }
 
 /**
  * The flow of one [AppPermission] for one screen: the user taps the feature ([start]), the flow
  * decides what comes next (the reason, the system dialog, the settings path) and reads the answer;
  * [state] is what the surface shows, [onResult] fires once per answer, granted or not, so the
- * feature runs from one place.
+ * feature runs from one place. A reason or settings path that the user closes with "Not now"
+ * ([dismiss]) counts as an answer too, so a chain of permissions goes on.
  *
  * Every read asks the system; nothing is cached across starts. The only thing kept is a mark that a
  * request was answered without a dialog, so the next start shows the settings path instead of a
  * dead button; a grant or a new rationale clears it.
  *
- * Get one from [AppPermission.request] (activity) or the kit's `rememberPermissionFlow` (Compose),
- * which also call [refresh] on every resume, [paused] on every pause and feed [onAnswer].
+ * The first read waits for the first use of [state], so the flow may be created as a property of an
+ * activity, before its context is attached. Get one from [AppPermission.request] (activity) or the
+ * kit's `rememberPermissionFlow` (Compose), which also call [refresh] on every resume, [paused] on
+ * every pause, feed [onAnswer], and keep [save] across a rotation.
  */
 class PermissionFlow(
     val permission: AppPermission,
@@ -51,19 +55,25 @@ class PermissionFlow(
     initialAsk: PermissionAsk? = null,
     private val onResult: (PermissionState) -> Unit = {},
 ) {
-    /** The steps whose silent answer this process saw itself; a mark from before is tried once more. Before [_state]: read() needs it. */
+    /** The steps whose silent answer this process saw itself; a mark from before is tried once more. */
     private val blockedSeen = mutableSetOf<PermissionKind>()
 
-    private val _state = MutableStateFlow(read(ask = initialAsk, busy = false))
+    /** The steps whose last answer was unsure (see [PermissionPolicy.Answer.UNSURE]); a second one in a row blocks. */
+    private val unsure = mutableSetOf<PermissionKind>()
+
+    private var restoredAsk: PermissionAsk? = initialAsk
+
+    // Read on first use, not in the constructor: an activity property is created before attachBaseContext.
+    private val _state: MutableStateFlow<PermissionState> by lazy { MutableStateFlow(read(ask = restoredAsk, busy = open != null)) }
 
     /** Everything a permission surface shows. */
-    val state: StateFlow<PermissionState> = _state
+    val state: StateFlow<PermissionState> get() = _state
 
     /** The texts of the step being asked for now. */
     val texts: PermissionTexts get() = permission.textsFor(_state.value.stage)
 
     private var rationaleBefore = false
-    private var askedAt = 0L
+    private var markedBefore = false
 
     /** The activity paused since the request went out: a dialog or page stood in front of it. */
     private var dialogShown = false
@@ -72,6 +82,8 @@ class PermissionFlow(
     private var open: PermissionKind? = null
     private var inSettings = false
 
+    /** The open reason or settings path came from [start] and has not been answered through [onResult] yet. */
+    private var askPending = false
 
     /** The user started the feature. Usable: [onResult] runs at once. Otherwise the reason, the dialog or the settings path. */
     fun start() {
@@ -84,21 +96,28 @@ class PermissionFlow(
     fun proceed() {
         val current = read()
         if (current.busy) return
+        askPending = false
         if (current.usable) finish(current) else launch(current)
     }
 
     /** Opens Android's settings for the current step; [refresh] on the way back reads what changed. */
     fun openSettings() {
         val current = read()
+        askPending = false
         inSettings = true
         open = current.stage
         _state.value = current.copy(ask = null, busy = true)
         platform.openSettings(current.stage)
     }
 
-    /** Closes the reason or the settings path without asking. */
+    /** Closes the reason or the settings path without asking. Counts as an answer when nothing was reported for it yet. */
     fun dismiss() {
-        _state.value = read().copy(ask = null)
+        val closed = read().copy(ask = null)
+        _state.value = closed
+        if (askPending) {
+            askPending = false
+            onResult(closed)
+        }
     }
 
     /**
@@ -132,31 +151,80 @@ class PermissionFlow(
             val granted = permission.granted(platform)
             val rationaleAfter = answered.permissions(platform.sdk).any(platform::showsRationale)
             val usableNow = PermissionPolicy.usable(answered, granted, platform.sdk)
-            // A silent answer sets the mark; a dialog that was shown, however it ended, clears a stale one.
-            val silent = PermissionPolicy.answeredWithoutDialog(usableNow, rationaleBefore, rationaleAfter, dialogShown, platform.now() - askedAt)
-            platform.markBlocked(answered, silent)
-            if (silent) blockedSeen += answered else blockedSeen -= answered
+            val answer = PermissionPolicy.answer(usableNow, rationaleBefore, rationaleAfter, dialogShown)
+            val blocked = PermissionPolicy.blocks(answer, markedBefore, answered in unsure)
+            // A silent answer sets the mark; a dialog that was shown clears a stale one; an unsure one waits for the next.
+            if (blocked) platform.markBlocked(answered, true) else if (answer == PermissionPolicy.Answer.DIALOG) platform.markBlocked(answered, false)
+            if (blocked) blockedSeen += answered else blockedSeen -= answered
+            if (answer == PermissionPolicy.Answer.UNSURE && !blocked) unsure += answered else unsure -= answered
         }
         // Without an open step (the screen was rebuilt while the dialog stood) the answer still counts.
         continueOrFinish(answered, read(busy = false), fromSettings = false)
     }
 
-    /** The option the settings path names for the current step. */
-    fun settingsOption(): String = platform.settingsOption(_state.value.stage)
+    /**
+     * The option the settings path names for the current step: Android's name in the phone's language,
+     * else the app's [PermissionTexts.option] (Android 10 has no name for "Allow all the time").
+     */
+    fun settingsOption(): String =
+        platform.settingsOption(_state.value.stage).ifEmpty { texts.option?.let(platform::text).orEmpty() }
+
+    /**
+     * What a rotation must keep: the open reason or settings path, the step a dialog or settings page
+     * is open for, and the answers so far. The bindings store it ([SavedFlow.toBundle]) and pass it to [restore].
+     */
+    fun save(): SavedFlow {
+        val steps = permission.steps(platform.sdk)
+        return SavedFlow(
+            ask = _state.value.ask,
+            open = open?.let(steps::indexOf) ?: -1,
+            inSettings = inSettings,
+            rationaleBefore = rationaleBefore,
+            markedBefore = markedBefore,
+            askPending = askPending,
+            blockedSeen = blockedSeen.map(steps::indexOf),
+            unsure = unsure.map(steps::indexOf),
+        )
+    }
+
+    /**
+     * Takes back what [save] kept, in the rebuilt screen. A dialog or settings page that was open
+     * stays open: its answer, or the return from the settings, continues where the old screen stopped.
+     */
+    fun restore(saved: SavedFlow?) {
+        saved ?: return
+        val steps = permission.steps(platform.sdk)
+        open = steps.getOrNull(saved.open)
+        inSettings = saved.inSettings && open != null
+        rationaleBefore = saved.rationaleBefore
+        markedBefore = saved.markedBefore
+        askPending = saved.askPending
+        // The screen went away while the dialog stood: something stood in front of it.
+        dialogShown = open != null
+        saved.blockedSeen.mapNotNull(steps::getOrNull).let(blockedSeen::addAll)
+        saved.unsure.mapNotNull(steps::getOrNull).let(unsure::addAll)
+        restoredAsk = saved.ask
+        _state.value = read(ask = restoredAsk, busy = open != null)
+    }
 
     private fun move(current: PermissionState, move: PermissionPolicy.Move) {
         when (move) {
             PermissionPolicy.Move.DONE -> finish(current)
-            PermissionPolicy.Move.EXPLAIN -> _state.value = current.copy(ask = PermissionAsk.REASON)
+            PermissionPolicy.Move.EXPLAIN -> ask(current, PermissionAsk.REASON)
             PermissionPolicy.Move.LAUNCH -> launch(current)
-            PermissionPolicy.Move.SETTINGS -> _state.value = current.copy(ask = PermissionAsk.SETTINGS)
+            PermissionPolicy.Move.SETTINGS -> ask(current, PermissionAsk.SETTINGS)
         }
+    }
+
+    private fun ask(current: PermissionState, ask: PermissionAsk) {
+        askPending = true
+        _state.value = current.copy(ask = ask)
     }
 
     private fun launch(current: PermissionState) {
         val wanted = current.stage.permissions(platform.sdk)
         rationaleBefore = wanted.any(platform::showsRationale)
-        askedAt = platform.now()
+        markedBefore = platform.isMarkedBlocked(current.stage)
         dialogShown = false
         open = current.stage
         _state.value = current.copy(ask = null, busy = true)
@@ -177,16 +245,21 @@ class PermissionFlow(
             // The first step came through: the next follows from the same tap, with the reason first where the app wants it.
             val next = PermissionPolicy.onStart(current.status, current.stage.partialUsable, permission.explain, current.confirmed)
             move(current, next)
-            if (next == PermissionPolicy.Move.SETTINGS) onResult(_state.value)
+            if (next == PermissionPolicy.Move.SETTINGS) report(_state.value)
             return
         }
         _state.value = if (current.status == PermissionStatus.BLOCKED && !fromSettings) current.copy(ask = PermissionAsk.SETTINGS) else current
-        onResult(_state.value)
+        report(_state.value)
     }
 
     private fun finish(current: PermissionState) {
         _state.value = current.copy(ask = null, busy = false)
-        onResult(_state.value)
+        report(_state.value)
+    }
+
+    private fun report(state: PermissionState) {
+        askPending = false
+        onResult(state)
     }
 
     private fun read(ask: PermissionAsk? = _state.value.ask, busy: Boolean = _state.value.busy): PermissionState {
@@ -199,7 +272,48 @@ class PermissionFlow(
         // A mark from before a grant in the settings, or before Android asks again, is stale.
         if (marked && status != PermissionStatus.BLOCKED) platform.markBlocked(stage, false)
         val confirmed = status != PermissionStatus.BLOCKED || stage in blockedSeen
-        return PermissionState(permission.kind, stage, status, ask, busy, confirmed)
+        return PermissionState(permission.kind, stage, status, ask, busy, confirmed, partial = stage.partial(granted, sdk))
+    }
+}
+
+/**
+ * What [PermissionFlow.save] keeps across a rotation, as plain values; steps are indexes into the
+ * permission's steps. [toBundle] and [from] carry it through the saved state of the bindings.
+ */
+data class SavedFlow(
+    val ask: PermissionAsk?,
+    val open: Int,
+    val inSettings: Boolean,
+    val rationaleBefore: Boolean,
+    val markedBefore: Boolean,
+    val askPending: Boolean,
+    val blockedSeen: List<Int>,
+    val unsure: List<Int>,
+) {
+    fun toBundle(): Bundle = Bundle().apply {
+        putString("ask", ask?.name)
+        putInt("open", open)
+        putBoolean("settings", inSettings)
+        putBoolean("rationale", rationaleBefore)
+        putBoolean("marked", markedBefore)
+        putBoolean("pending", askPending)
+        putIntArray("seen", blockedSeen.toIntArray())
+        putIntArray("unsure", unsure.toIntArray())
+    }
+
+    companion object {
+        fun from(bundle: Bundle?): SavedFlow? = bundle?.let {
+            SavedFlow(
+                ask = it.getString("ask")?.let(PermissionAsk::valueOf),
+                open = it.getInt("open", -1),
+                inSettings = it.getBoolean("settings"),
+                rationaleBefore = it.getBoolean("rationale"),
+                markedBefore = it.getBoolean("marked"),
+                askPending = it.getBoolean("pending"),
+                blockedSeen = it.getIntArray("seen")?.toList().orEmpty(),
+                unsure = it.getIntArray("unsure")?.toList().orEmpty(),
+            )
+        }
     }
 }
 

@@ -3,6 +3,7 @@ package one.tearoom.permissions
 import android.app.Activity
 import android.app.LocaleManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -10,7 +11,6 @@ import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultRegistry
@@ -30,8 +30,6 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
 
     override fun showsRationale(permission: String) = activity.shouldShowRequestPermissionRationale(permission)
 
-    override fun now() = SystemClock.elapsedRealtime()
-
     private val marks get() = activity.getSharedPreferences(MARKS, Context.MODE_PRIVATE)
 
     override fun isMarkedBlocked(stage: PermissionKind) = key(stage)?.let { marks.getBoolean(it, false) } ?: false
@@ -46,6 +44,8 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
     override fun openSettings(stage: PermissionKind) = PermissionSettings.open(activity, stage)
 
     override fun settingsOption(stage: PermissionKind) = PermissionSettings.option(activity, stage)
+
+    override fun text(id: Int): String = activity.getString(id)
 
     private fun key(stage: PermissionKind) = stage.permissions(sdk).firstOrNull()
 
@@ -67,11 +67,22 @@ object PermissionSettings {
         else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
     }
 
-    /** Opens [intent]; from an activity on top of it, so back returns to the screen. */
+    /**
+     * Opens [intent]; from an activity on top of it, so back returns to the screen. The activity is
+     * found through wrappers (an app's themed or localised Compose context); only without one does
+     * the page open in a task of its own.
+     */
     fun open(context: Context, stage: PermissionKind) {
         val intent = intent(context, stage)
-        if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(intent) }
+        val activity = context.activity()
+        if (activity == null) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { (activity ?: context).startActivity(intent) }
+    }
+
+    private tailrec fun Context.activity(): Activity? = when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.activity()
+        else -> null
     }
 
     /**
@@ -83,6 +94,10 @@ object PermissionSettings {
         is PermissionKind.BackgroundLocation -> backgroundOptionLabel(context)
         else -> groupLabel(context, stage)
     }
+
+    /** [option] for [stage] of [permission], with the app's [PermissionTexts.option] where Android names none. */
+    fun option(context: Context, permission: AppPermission, stage: PermissionKind = permission.kind): String =
+        option(context, stage).ifEmpty { permission.textsFor(stage).option?.let(context::getString).orEmpty() }
 
     /**
      * `backgroundPermissionOptionLabel` follows the app's language, the settings page the system's;
@@ -155,9 +170,15 @@ internal fun AppPermission.activityFlow(
     }
     val created = PermissionFlow(this, ActivityPlatform(activity) { launcher.launch(it.toTypedArray()) }, onResult = onResult)
     flow = created
+
+    // A rotation keeps the open step and the answers: the saved state is registered now and read after onCreate restored it.
+    val saved = activity.savedStateRegistry
+    val key = generateSequence(0) { it + 1 }.map { "$SAVED_STATE/$kind/$it" }.first { saved.getSavedStateProvider(it) == null }
+    saved.registerSavedStateProvider(key) { created.save().toBundle() }
     activity.lifecycle.addObserver(
         LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_CREATE -> created.restore(SavedFlow.from(saved.consumeRestoredStateForKey(key)))
                 Lifecycle.Event.ON_RESUME -> created.refresh()
                 Lifecycle.Event.ON_PAUSE -> created.paused()
                 else -> Unit
@@ -166,6 +187,8 @@ internal fun AppPermission.activityFlow(
     )
     return created
 }
+
+private const val SAVED_STATE = "one.tearoom.permissions"
 
 /** The flow for an activity with another result registry, for tests. */
 fun AppPermission.request(activity: ComponentActivity, registry: ActivityResultRegistry, onResult: (PermissionState) -> Unit = {}): PermissionFlow =

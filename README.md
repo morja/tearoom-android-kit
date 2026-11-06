@@ -143,7 +143,8 @@ Button(onClick = notifications::start) { Text(stringResource(R.string.turn_on_sy
 PermissionSheet(notifications)                    // the reason before the dialog, the settings path when blocked
 PermissionHint(notifications)                     // the persistent line while the feature is on and the permission off
 
-// An activity: register before it starts.
+// An activity: a property, so the launcher registers before the activity starts. The first read waits
+// for the first use, and a rotation keeps the open step.
 private val location = DeviceLocation.request(this) { if (it.usable) startRecording() }
 ```
 
@@ -155,21 +156,26 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
 - `start()` on the tap that starts the feature: usable, and `onResult` runs at once; otherwise the
   app's reason (`PermissionAsk.REASON`, or straight to the dialog with `Explain.SCREEN` where the
   screen says why), the system dialog, or the settings path (`PermissionAsk.SETTINGS`) once Android
-  answers without a dialog (no rationale after one before, no pause of the activity, or an answer
-  within a second). `proceed()` from the reason, `openSettings()`, `dismiss()`; `refresh()` runs on
+  answers without a dialog: the rationale went after the second refusal, or the activity never
+  paused; an answer that could be either a dismissed dialog or a silent one counts at the second in
+  a row. `proceed()` from the reason, `openSettings()`, `dismiss()` (closing the reason or the
+  settings path with "Not now" reports to `onResult` too, so a chain goes on); `refresh()` runs on
   every resume and `paused()` on every pause, both from the bindings, so a grant or a revoke in the
   settings shows at once. A block that only the kit's mark remembers (`PermissionState.confirmed`
-  false) is asked once more before the settings path is named.
-- `state` (`PermissionState`: `status`, `stage`, `ask`, `busy`, `usable`) is everything a surface
-  shows; an app with a surface of its own reads it and calls the same methods. `status.textRes(texts)`
-  gives the app's line for a status, `flow.texts` the texts of the step being asked for.
+  false) is asked once more before the settings path is named. Both bindings keep `save()` across a
+  rotation: a dialog's answer continues the background step, the return from the settings answers.
+- `state` (`PermissionState`: `status`, `stage`, `ask`, `busy`, `usable`, `confirmed`, `partial`) is
+  everything a surface shows; an app with a surface of its own reads it and calls the same methods.
+  `state.textRes(texts)` gives the app's line (the `partial` text while approximate is granted and
+  precise refused, the settings path while blocked), `flow.texts` the texts of the step being asked for.
 - Background work reads `Permission.isUsable(context)` (or `isGranted` for the full grant), which
   asks the system every time. Nothing is cached across starts (skill `android-permissions`); the only
   mark kept is "answered without a dialog", in the kit's own preferences file, cleared by a grant.
 - `PermissionSheet` and `PermissionHint` are Material 3, drawn from the host app's `MaterialTheme`,
   spacing through `PermissionStyle`. Texts come from `PermissionTexts`; the settings path's `%1$s`
   is Android's own name of "Allow all the time" for the background location, the permission group's
-  label otherwise.
+  label otherwise, and `PermissionTexts.option` where Android names none (Android 10 for "Allow all
+  the time"). Buttons take two lines, so long translations at a large font wrap instead of being cut.
 
 ## testing in short
 

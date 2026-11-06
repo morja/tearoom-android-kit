@@ -56,6 +56,14 @@ class PermissionKindTest {
         assertEquals(listOf(READ_MEDIA_AUDIO), PermissionKind.Media(images = false, audio = true).permissions(34))
     }
 
+    @Test fun `audio asked with photos is never partial, the selection covers only the visual permissions`() {
+        val withAudio = PermissionKind.Media(images = true, audio = true)
+        assertFalse(withAudio.partial(setOf(READ_MEDIA_VISUAL_USER_SELECTED), 34))
+        assertFalse(PermissionPolicy.usable(withAudio, setOf(READ_MEDIA_VISUAL_USER_SELECTED), 34))
+        assertTrue(withAudio.partial(setOf(READ_MEDIA_VISUAL_USER_SELECTED, READ_MEDIA_AUDIO), 34))
+        assertTrue(PermissionPolicy.usable(withAudio, setOf(READ_MEDIA_VISUAL_USER_SELECTED, READ_MEDIA_AUDIO), 34))
+    }
+
     @Test fun `selected photos on Android 14 are partial and usable`() {
         val selected = setOf(READ_MEDIA_VISUAL_USER_SELECTED)
         assertTrue(PermissionKind.Media().partial(selected, 34))
@@ -73,7 +81,9 @@ class PermissionKindTest {
 
     @Test fun `wifi discovery has its own permission from Android 13`() {
         assertEquals(listOf(NEARBY_WIFI_DEVICES), PermissionKind.NearbyDevices(scan = false, connect = false, wifi = true).permissions(33))
-        assertEquals(listOf(ACCESS_FINE_LOCATION), PermissionKind.NearbyDevices(scan = false, connect = false, wifi = true).permissions(31))
+        // Android 12 ignores fine without coarse (REV-4 finding 6).
+        assertEquals(listOf(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION), PermissionKind.NearbyDevices(scan = false, connect = false, wifi = true).permissions(31))
+        assertEquals(listOf(BLUETOOTH_SCAN, BLUETOOTH_CONNECT, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION), PermissionKind.NearbyDevices(wifi = true).permissions(32))
         // Below 12 scan and wifi share the fine location, asked once.
         assertEquals(listOf(ACCESS_FINE_LOCATION), PermissionKind.NearbyDevices(wifi = true).permissions(30))
     }

@@ -46,6 +46,9 @@ enum class PermissionAsk {
  *   that rests on the mark of an earlier process, which may be stale (a reinstall with a backup,
  *   Android's reset of an unused app): a surface then offers to ask once more, and the flow tries
  *   Android before it names the settings path.
+ * @param partial part of the kind is granted (the approximate location, the selected photos), whatever
+ *   [status] says about the rest: "approximate allowed, precise refused" is [PermissionStatus.DENIED]
+ *   with this set, a blocked precise location with approximate granted is [PermissionStatus.BLOCKED].
  */
 data class PermissionState(
     val kind: PermissionKind,
@@ -54,6 +57,7 @@ data class PermissionState(
     val ask: PermissionAsk? = null,
     val busy: Boolean = false,
     val confirmed: Boolean = true,
+    val partial: Boolean = false,
 ) {
     /** The feature may run: the whole kind is granted, not needed here, or partially granted where that is enough. */
     val usable: Boolean

@@ -90,6 +90,14 @@ class ActivityPlatformTest {
         assertFalse(app.getSharedPreferences("one.tearoom.permissions", Context.MODE_PRIVATE).contains(CAMERA))
     }
 
+    @Test fun `the settings open on top of the activity behind a wrapped context`() {
+        val wrapped = android.view.ContextThemeWrapper(activity, 0)
+        PermissionSettings.open(wrapped, PermissionKind.Camera)
+        val intent = shadowOf(activity).nextStartedActivity
+        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
+        assertEquals(0, intent.flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
     @Test fun `notifications open the app's notification settings`() {
         val flow = flow(AppPermission(PermissionKind.Notifications, texts))
         flow.openSettings()
@@ -148,6 +156,46 @@ class ActivityPlatformTest {
         assertEquals(listOf(POST_NOTIFICATIONS), PermissionKind.Notifications.permissions(33))
     }
 
+    @Test fun `a flow declared as a property of the activity reads nothing before the activity is attached`() {
+        PropertyActivity.registry = registry
+        val controller = Robolectric.buildActivity(PropertyActivity::class.java).setup()
+        val property = controller.get()
+        assertEquals(PermissionStatus.NOT_ASKED, property.flow.state.value.status)
+
+        property.flow.start()
+        assertEquals(listOf(ACCESS_COARSE_LOCATION), registry.launched)
+        shadowOf(app).grantPermissions(ACCESS_COARSE_LOCATION)
+        registry.answer(mapOf(ACCESS_COARSE_LOCATION to true))
+        assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), registry.launched)
+    }
+
+    @Test fun `a rotation during the foreground dialog, the answer to the rebuilt activity continues the background step`() {
+        PropertyActivity.registry = registry
+        val controller = Robolectric.buildActivity(PropertyActivity::class.java).setup()
+        controller.get().flow.start()
+        assertEquals(listOf(ACCESS_COARSE_LOCATION), registry.launched)
+
+        controller.recreate()
+        val rebuilt = controller.get()
+        assertTrue(rebuilt.flow.state.value.busy)
+        shadowOf(app).grantPermissions(ACCESS_COARSE_LOCATION)
+        registry.answer(mapOf(ACCESS_COARSE_LOCATION to true))
+        assertEquals(listOf(ACCESS_BACKGROUND_LOCATION), registry.launched)
+        assertEquals(PermissionKind.BackgroundLocation(), rebuilt.flow.state.value.stage)
+    }
+
+    @Test fun `a rotation in the settings, the return to the rebuilt activity answers`() {
+        PropertyActivity.registry = registry
+        val controller = Robolectric.buildActivity(PropertyActivity::class.java).setup()
+        controller.get().flow.openSettings()
+        // The activity is rebuilt while the settings are in front; the grant is made there, then the user comes back.
+        shadowOf(app).grantPermissions(ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION)
+        controller.recreate()
+        val rebuilt = controller.get()
+        assertTrue(rebuilt.flow.state.value.usable)
+        assertTrue(rebuilt.results.single().usable)
+    }
+
     /** Records what the flow launches and hands back the test's answer. */
     class TestRegistry : ActivityResultRegistry() {
         var launched: List<String>? = null
@@ -162,5 +210,18 @@ class ActivityPlatformTest {
         fun answer(result: Map<String, Boolean>) {
             dispatchResult(code, result)
         }
+    }
+}
+
+/** An activity that declares its flow as a property, the form README and HO-1 show (REV-4 finding 1). */
+class PropertyActivity : ComponentActivity() {
+    val results = mutableListOf<PermissionState>()
+    private val texts = PermissionTexts(reason = 1, denied = 2, blocked = 3, allow = 4, openSettings = 5, notNow = 6)
+    private val location = AppPermission(PermissionKind.Location(), texts, explain = Explain.SCREEN)
+    val flow = AppPermission(PermissionKind.BackgroundLocation(), texts, explain = Explain.SCREEN, first = location)
+        .request(this, registry) { results += it }
+
+    companion object {
+        lateinit var registry: ActivityResultRegistry
     }
 }

@@ -60,15 +60,15 @@ fun PermissionSheet(
                 PermissionAsk.REASON -> {
                     Text(stringResource(texts.reason), style = MaterialTheme.typography.bodyLarge)
                     Column(verticalArrangement = Arrangement.spacedBy(style.gap)) {
-                        Button(onClick = flow::proceed, modifier = width) { Text(stringResource(texts.allow), maxLines = 1) }
-                        TextButton(onClick = flow::dismiss) { Text(stringResource(texts.notNow), maxLines = 1) }
+                        Button(onClick = flow::proceed, modifier = width) { Text(stringResource(texts.allow), maxLines = 2) }
+                        TextButton(onClick = flow::dismiss) { Text(stringResource(texts.notNow), maxLines = 2) }
                     }
                 }
                 PermissionAsk.SETTINGS -> {
                     Text(stringResource(texts.blocked, flow.settingsOption()), style = MaterialTheme.typography.bodyLarge)
                     Column(verticalArrangement = Arrangement.spacedBy(style.gap)) {
-                        Button(onClick = flow::openSettings, modifier = width) { Text(stringResource(texts.openSettings), maxLines = 1) }
-                        TextButton(onClick = flow::dismiss) { Text(stringResource(texts.notNow), maxLines = 1) }
+                        Button(onClick = flow::openSettings, modifier = width) { Text(stringResource(texts.openSettings), maxLines = 2) }
+                        TextButton(onClick = flow::dismiss) { Text(stringResource(texts.notNow), maxLines = 2) }
                     }
                 }
             }

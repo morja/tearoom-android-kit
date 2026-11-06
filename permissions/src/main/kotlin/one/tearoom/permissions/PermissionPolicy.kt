@@ -42,7 +42,8 @@ object PermissionPolicy {
         return when {
             wanted.isEmpty() -> PermissionStatus.NOT_NEEDED
             wanted.all { it in granted } -> PermissionStatus.GRANTED
-            // Enough of a grant stands on its own; one that is not enough is refused or blocked like a missing one.
+            // Enough of a grant stands on its own; one that is not enough is refused or blocked like a missing one,
+            // and PermissionState.partial carries the part that is there.
             partial && stage.partialUsable -> PermissionStatus.PARTIAL
             wanted.any { it in rationale } -> PermissionStatus.DENIED
             blocked -> PermissionStatus.BLOCKED
@@ -51,24 +52,44 @@ object PermissionPolicy {
         }
     }
 
-    /**
-     * A request that Android answered faster than this showed no dialog a person could have read.
-     * Weatherfold measured 400 ms as too short on a slow phone (5 November 2026).
-     */
-    const val SILENT_ANSWER_MILLIS = 1000L
+    /** What an answer to a request says about the dialog. */
+    enum class Answer {
+        /** A dialog was shown and answered: granted, or refused once and Android explains from now on. */
+        DIALOG,
+
+        /**
+         * No dialog: Android stopped explaining after the second refusal (rationale before, none after),
+         * or the activity never paused for the request.
+         */
+        SILENT,
+
+        /**
+         * The activity paused, nothing was granted, and Android explains neither before nor after. Either
+         * a first dialog dismissed with back or outside (no flag changes), or a blocked permission whose
+         * silent answer flashes the permission controller (Android 14) however long it takes. The two
+         * cannot be told apart from one answer (Paperboat QA-2, REV-4 finding 3).
+         */
+        UNSURE,
+    }
+
+    /** Classifies one answer from what Android says before and after it. No clock: a silent answer took 1.4 s on a cold start. */
+    fun answer(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, dialogShown: Boolean): Answer = when {
+        usableNow || rationaleAfter -> Answer.DIALOG
+        rationaleBefore || !dialogShown -> Answer.SILENT
+        else -> Answer.UNSURE
+    }
 
     /**
-     * Android answered a request without showing anything, so the permission is blocked. Three signs,
-     * any one of them enough, because none holds alone (Paperboat QA-2, 6 November 2026): after the
-     * second refusal Android stops explaining ([rationaleAfter] false) although it did before
-     * ([rationaleBefore] true); no dialog came at all, the activity never paused ([dialogShown] false);
-     * or the answer came within [SILENT_ANSWER_MILLIS]. A fixed permission on Android 14 starts the
-     * permission controller for a moment, so the activity may pause for a silent answer, and a cold
-     * start can slow that answer past a second; a dialog dismissed with back leaves no flag at all.
-     * A silent answer that slips through is tried again on the next tap ([onStart]), so the cost is a tap.
+     * Whether an [answer] means the permission is blocked. Silent always; unsure when a mark from an
+     * earlier process already said so ([markedBefore]) or when the last answer for the step was unsure
+     * too ([unsureBefore]): a dismissed dialog twice in a row is rare, a blocked permission answers so
+     * every time. A first dismissal never blocks; a block found only on the second tap costs one tap.
      */
-    fun answeredWithoutDialog(usableNow: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, dialogShown: Boolean, elapsedMillis: Long): Boolean =
-        !usableNow && !rationaleAfter && (rationaleBefore || !dialogShown || elapsedMillis < SILENT_ANSWER_MILLIS)
+    fun blocks(answer: Answer, markedBefore: Boolean, unsureBefore: Boolean): Boolean = when (answer) {
+        Answer.DIALOG -> false
+        Answer.SILENT -> true
+        Answer.UNSURE -> markedBefore || unsureBefore
+    }
 
     /**
      * What a tap on the feature does for [status]. A partial grant that is enough is done: the app

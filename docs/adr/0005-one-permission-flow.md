@@ -21,13 +21,19 @@ Status: accepted, 6 November 2026 (user decision, Mathis: every permission kind 
   app is left and nothing more. The one thing kept, in the kit's own preferences file, is a mark that
   Android answered a request without a dialog, so the next start shows the settings path instead of
   a dead button. A grant or a new rationale clears it.
-- Blocked is read from Android, not guessed from the user, by three signs of which any one is enough
-  (Paperboat QA-2, 6 November 2026, after each alone failed): after the second refusal Android stops
-  explaining the permission (`shouldShowRequestPermissionRationale` true before the request, false
-  after); no dialog came at all, the activity never paused; or the answer came within a second. A
-  fixed permission on Android 14 flashes the permission controller, so the activity may pause for a
-  silent answer, and a cold start can slow that answer past a second; a dialog dismissed with back
-  leaves no flag. A silent answer that slips through costs one tap: the next tap asks Android again.
+- Blocked is read from Android, not guessed from the user. Silent for sure: after the second refusal
+  Android stops explaining the permission (`shouldShowRequestPermissionRationale` true before the
+  request, false after), or the activity never paused for the request. Unsure: the activity paused,
+  nothing was granted and Android explains neither before nor after; that is a first dialog dismissed
+  with back, or a blocked permission whose silent answer flashes the permission controller (Android
+  14), however long it takes. An unsure answer blocks only when the kit's mark already said so or
+  when the last answer for the step was unsure too; a first dismissal never blocks, and a block found
+  only on the second tap costs that tap. No clock: a silent answer took 1.4 s on a cold start, and a
+  person can dismiss a dialog in less than a second (Paperboat QA-2, REV-4 finding 3).
+- A flow keeps across a rotation what it is waiting for (the open step of a dialog or the settings,
+  the open sheet, the answers so far) and reads the system for the first time on first use, so it can
+  be an activity property (REV-4 findings 1 and 2). Closing the reason or the settings path with
+  "Not now" reports to the app like an answer, so a chain of permissions goes on (finding 9).
 - The reason comes first: the kit asks for its reason sheet before the first dialog and after a
   refusal (`Explain.SHEET`), or the screen that starts the feature carries the reason and the dialog
   opens at once (`Explain.SCREEN`, Weatherfold's welcome and disclosure pages). In both modes a

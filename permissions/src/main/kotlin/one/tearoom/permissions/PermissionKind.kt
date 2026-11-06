@@ -68,14 +68,18 @@ sealed class PermissionKind {
 
         private fun visual() = listOfNotNull(IMAGES.takeIf { images }, VIDEO.takeIf { video })
 
-        /** "Select photos": Android 14 grants the selection and keeps the full library back. */
+        /**
+         * "Select photos": Android 14 grants the selection and keeps the full library back. Only the visual
+         * permissions can be partial; audio asked for alongside must be granted in full (REV-4 finding 7).
+         */
         override fun partial(granted: Set<String>, sdk: Int) =
-            sdk >= 34 && USER_SELECTED in granted && visual().any { it !in granted }
+            sdk >= 34 && USER_SELECTED in granted && visual().any { it !in granted } && (!audio || AUDIO in granted)
     }
 
     /**
      * Bluetooth and Wi-Fi discovery and connection (Android 12 and later; before that Android ties
-     * scanning to the fine location). The app declares `neverForLocation` on `BLUETOOTH_SCAN` in its
+     * scanning to the fine location). Wi-Fi discovery on Android 12 still needs the location, fine
+     * and coarse together. The app declares `neverForLocation` on `BLUETOOTH_SCAN` in its
      * manifest where it derives no location from the scan.
      */
     data class NearbyDevices(val scan: Boolean = true, val connect: Boolean = true, val wifi: Boolean = false) : PermissionKind() {
@@ -91,7 +95,12 @@ sealed class PermissionKind {
                 add(FINE)
             }
             if (wifi) {
-                if (sdk >= 33) add(NEARBY_WIFI) else if (FINE !in this) add(FINE)
+                when {
+                    sdk >= 33 -> add(NEARBY_WIFI)
+                    // Android 12 ignores a request for the fine location without the coarse one (REV-4 finding 6).
+                    sdk >= 31 -> addAll(listOf(FINE, COARSE))
+                    FINE !in this -> add(FINE)
+                }
             }
         }
     }
