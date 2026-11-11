@@ -27,6 +27,12 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
   dialog, the settings path when blocked) and `PermissionHint` (the persistent line on a screen whose
   feature waits for its permission), drawn from the host app's `MaterialTheme`; spacing through
   `PermissionStyle`, the only file with sizes. No theme, no text of its own.
+- `:review` (`one.tearoom:review`, 1.0.0) – the one rating prompt (ADR-0006): `AppReview` (one per
+  app, `ReviewConfig` with the Play id and the calm delay) counts opening days, asks Google Play's
+  In-App Review once the rule of `ReviewPolicy` is met and the app's main screen is calm, and opens
+  the Play listing for the app's "Rate the app" row (`openListing`). The Play call sits behind
+  `ReviewLauncher`; test builds force it through `FakeReviewManager` (`forceNext`, `reset`,
+  `ReviewDebugReceiver`). No surface: the row is the app's.
 - `:testing` (`one.tearoom:testing`) – the rules behind the apps' guardrail tests as a pure JVM
   library (ADR-0003): `Guardrails.sources`, `colourLiterals`, `rawSizes`, `forbiddenImports`, `onlyIn`,
   `translations`, plus `Baseline` for counted exceptions that may only shrink. No Android, no test
@@ -43,7 +49,7 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
 3. Plain `com.android.billingclient:billing` (callbacks), not `billing-ktx`.
 4. AGP, Kotlin and Gradle follow the newest app that includes this build (now Dahlia: AGP 9.4.1,
    built-in Kotlin 2.4.20, Gradle 9.8.0; the Kotlin JVM plugin of `:testing` and the Compose plugin of
-   the `-ui` modules match that Kotlin). minSdk 26, Java 17 bytecode. `:unlock` and `:permissions`
+   the `-ui` modules match that Kotlin). minSdk 26, Java 17 bytecode. `:unlock`, `:permissions` and `:review`
    compile against 36 and may stay below an app's compileSdk; `:unlock-ui` and `:permissions-ui`
    compile against the Compose BOM the newest app uses (2026.09.00, compileSdk 37) and every app on
    them uses the same BOM (ADR-0004).
@@ -57,12 +63,14 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
    once by hand on its reference app: the purchase on Dahlia with the billing test matrix of the
    skill `app-release`, the permissions on Weatherfold (location, background location) and Paperboat
    (notifications) with the lifecycle matrix of the skill `android-permissions` (ADR-0004, ADR-0005).
+   In `:review` a case in `ReviewPolicyTest` or, at the Play and lifecycle boundary, `AppReviewTest`
+   (Robolectric, a fake `ReviewLauncher`).
 7. Every app that includes the library must still pass its own checks after a change here; the
    library has no version pinning between apps.
 8. Never log purchase tokens, order ids or signatures.
 
 ## Checks
 
-- `scripts/check` – unit tests of all five modules, lint and release builds of the four Android ones.
+- `scripts/check` – unit tests of all six modules, lint and release builds of the five Android ones.
 
 Agents work on branches, never push, merge into another repo or publish.

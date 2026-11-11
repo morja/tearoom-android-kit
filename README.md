@@ -4,7 +4,8 @@ Shared Android code for the tearoom.one apps. Modules: `unlock`, a hardened one-
 through Google Play Billing (taken over from Lazy Moves, billing hardening of 16 October 2026) with
 `AppUnlock` as the one holder every app declares; `unlock-ui`, the default purchase surface in Compose
 and Material 3; `permissions`, one flow for asking, losing and recovering a runtime permission, with
-`permissions-ui` as its default surface; and `testing`, the rules behind the apps' guardrail tests as
+`permissions-ui` as its default surface; `review`, the one rule for asking for a Google Play rating
+and the Play listing behind each app's "Rate the app" row; and `testing`, the rules behind the apps' guardrail tests as
 a pure JVM library. The rule behind the flows: flows in the kit, surfaces in the apps (ADR-0004).
 
 ## Using it in an app
@@ -37,6 +38,7 @@ implementation("one.tearoom:unlock:1.1.1")
 implementation("one.tearoom:unlock-ui:1.1.1") // the default purchase sheet; apps with their own surface skip it
 implementation("one.tearoom:permissions:1.0.0")
 implementation("one.tearoom:permissions-ui:1.0.0") // the default permission sheet and hint; the same rule
+implementation("one.tearoom:review:1.0.0") // the rating prompt and the listing for the settings row
 testImplementation("one.tearoom:testing:1.0.0")
 ```
 
@@ -190,6 +192,40 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
   only the user can turn a channel off, and One UI hides the list of channels by default, but opens
   this page all the same (checked on One UI 8.5, 11 November 2026).
 
+## review in short
+
+```kotlin
+// One top-level value per app.
+val Review = AppReview(ReviewConfig(playPackage = "one.tearoom.weatherfold"))
+
+// The main activity counts its starts as openings (one per calendar day).
+override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); Review.observe(this) }
+
+// The main screen: calm = no error, no permission request, no purchase, no onboarding on screen.
+LaunchedEffect(calm) { if (calm) Review.askIfDue(activity) }
+
+// The app's own "Rate the app" row, in the app's row style.
+SettingsRow(stringResource(R.string.rate_app), onClick = { Review.openListing(context) })
+```
+
+- The rule is the same in every app (ADR-0006): at least 7 days since the first opening and the app
+  opened on at least 10 different local calendar days, at most once per versionCode. `ReviewPolicy`
+  holds it as pure functions; the record lives in the kit's preferences file `one.tearoom.review`.
+- `askIfDue` tries on every resume while the screen stays calm (a return from the background is the
+  next opening): it waits `ReviewConfig.calmFor` (2 s) and asks only if the activity is still resumed
+  and the rule still holds; leaving the calm state or a pause cancels the wait. The prompt counts as asked only when
+  Play accepts the request; Play throttles on its own and never says whether the dialog showed.
+- `openListing` opens `market://details?id=…`, else the web page; false when neither opens. Builds
+  with an id suffix pass `playPackage`.
+- Test builds: `Review.forceNext(context)` prompts at the next calm moment through
+  `FakeReviewManager` (which shows nothing), `Review.reset(context)` forgets everything,
+  `Review.status(context).describe()` is an English debug line ("3 of 7 days · 4 of 10 opening
+  days · …"). An app without a debug screen declares `ReviewDebugReceiver` in its
+  `src/debug/AndroidManifest.xml` and uses adb:
+  `adb shell am broadcast -n <app id>/one.tearoom.review.ReviewDebugReceiver -a one.tearoom.review.FORCE`
+  (also `RESET` and `STATUS`; the status line comes back as the broadcast's data).
+- No own pre-question, no routing of unhappy users, no reward: Google forbids all three.
+
 ## testing in short
 
 `one.tearoom.testing.Guardrails` scans sources and resources and returns hits; the app's test asserts
@@ -242,6 +278,15 @@ Since 27 October 2026 no app has its own Play Billing code; since 6 November 202
 
 Since 6 November 2026 all four apps and the Cockpit template run their guardrail tests on `testing`
 (Lazy Moves with a counted baseline for raw sizes).
+
+Since 11 November 2026 all four ask for a Play rating through `review` (ADR-0006, proposed):
+
+| App | Row "Rate the app" | Calm means | Debug |
+|---|---|---|---|
+| Weatherfold | About page, under Privacy policy | today screen with a place, nothing loading or failed, no location question, no purchase | card on the About page |
+| Dahlia | menu, Dahlia page, between Tour and About | editor with a picture, no tour, sheet, menu, About, export or purchase | adb, `ReviewDebugReceiver` in the local builds |
+| Paperboat | Settings, About group, under Version | chat with nothing open, no notice, pairing or notification question | group in Settings (debuggable builds) |
+| Lazy Moves | Settings, Help and info, under Contact support | diary without a location problem, notice, first-start question, restore offer or data operation | Developer tools in Settings |
 
 ## Checks
 
