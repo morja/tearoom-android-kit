@@ -106,6 +106,15 @@ class ActivityPlatformTest {
         assertEquals(app.packageName, intent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
     }
 
+    @Test fun `a channel opens its own page on top of the activity`() {
+        PermissionSettings.openChannel(activity, "connection")
+        val intent = shadowOf(activity).nextStartedActivity
+        assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, intent.action)
+        assertEquals(app.packageName, intent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
+        assertEquals("connection", intent.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+        assertEquals(0, intent.flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
     @Test fun `revoked while running, the resume shows it`() {
         shadowOf(app).grantPermissions(CAMERA)
         val flow = flow(AppPermission(PermissionKind.Camera, texts))

@@ -19,7 +19,8 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
   runtime permission (ADR-0005): `AppPermission` (one per kind and app, with `PermissionTexts` and
   `Explain`), `PermissionKind` with the Android version branches, `PermissionFlow` over the Activity
   Result APIs (`AppPermission.request(activity)`), pure rules in `PermissionPolicy`, the settings
-  intents and the system's option label in `PermissionSettings`. No grant is cached; only the mark
+  intents (the app's pages and the page of one notification channel) and the system's option label in
+  `PermissionSettings`. No grant is cached; only the mark
   "answered without a dialog" lives in the kit's own preferences file.
 - `:permissions-ui` (`one.tearoom:permissions-ui`, 1.0.0) – the default permission surface:
   `rememberPermissionFlow` (the flow for a Compose screen), `PermissionSheet` (the reason before the

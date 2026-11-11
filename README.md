@@ -185,6 +185,10 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
   is Android's own name of "Allow all the time" for the background location, the permission group's
   label otherwise, and `PermissionTexts.option` where Android names none (Android 10 for "Allow all
   the time"). Buttons take two lines, so long translations at a large font wrap instead of being cut.
+- `PermissionSettings.openChannel(context, channelId)` opens the system page of one notification
+  channel, for a settings row such as "Hide the permanent notification" of a foreground service:
+  only the user can turn a channel off, and One UI hides the list of channels by default, but opens
+  this page all the same (checked on One UI 8.5, 11 November 2026).
 
 ## testing in short
 

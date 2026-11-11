@@ -72,8 +72,21 @@ object PermissionSettings {
      * found through wrappers (an app's themed or localised Compose context); only without one does
      * the page open in a task of its own.
      */
-    fun open(context: Context, stage: PermissionKind) {
-        val intent = intent(context, stage)
+    fun open(context: Context, stage: PermissionKind) = start(context, intent(context, stage))
+
+    /**
+     * The page of one notification channel of the app, with its switch, sound and vibration. Android
+     * lets only the user turn a channel off, and some systems hide the list of channels (One UI since
+     * 6.1); this link opens the channel's page all the same.
+     */
+    fun channelIntent(context: Context, channelId: String): Intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+
+    /** Opens [channelIntent], on top of the activity like [open]. */
+    fun openChannel(context: Context, channelId: String) = start(context, channelIntent(context, channelId))
+
+    private fun start(context: Context, intent: Intent) {
         val activity = context.activity()
         if (activity == null) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { (activity ?: context).startActivity(intent) }
