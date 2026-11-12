@@ -98,7 +98,7 @@ class AppReview internal constructor(
         }
     }
 
-    /** One try, for the activity in front: true when Play took the request. */
+    /** One try, for the activity in front: true when Play's flow was shown. */
     internal suspend fun askOnce(activity: ComponentActivity): Boolean {
         if (!isDue(activity)) return false
         delay(config.calmFor)
@@ -106,11 +106,16 @@ class AppReview internal constructor(
 
         val fake = ReviewStore.read(activity).forced
         return suspendCancellableCoroutine { cont ->
-            launcher(activity, fake).launch(activity) { accepted ->
-                // Marked right away, before Play's dialog pauses the activity and cancels the wait. Only when Play
-                // took the request: no Play or no network tries again on the next opening.
-                if (accepted) ReviewStore.update(activity) { ReviewPolicy.asked(it, versionCode(activity), now(), fake) }
-                if (cont.isActive) cont.resume(accepted)
+            // Play answers after a moment. By then the screen may have left the calm state, the activity paused
+            // or a newer try started (this one is then cancelled): only a try still waiting shows the dialog.
+            val wanted = {
+                cont.isActive && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && isDue(activity)
+            }
+            launcher(activity, fake).launch(activity, wanted) { shown ->
+                // Marked right away, before Play's dialog pauses the activity and cancels the wait. Only when the flow
+                // was shown: no Play, no network or a screen no longer calm tries again on the next opening.
+                if (shown) ReviewStore.update(activity) { ReviewPolicy.asked(it, versionCode(activity), now(), fake) }
+                if (cont.isActive) cont.resume(shown)
             }
         }
     }

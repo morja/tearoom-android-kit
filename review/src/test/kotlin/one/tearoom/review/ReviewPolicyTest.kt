@@ -12,7 +12,7 @@ class ReviewPolicyTest {
     private fun openedOn(vararg days: Long) = days.fold(ReviewRecord()) { r, d -> ReviewPolicy.opened(r, day0 + d) }
 
     @Test fun `the first opening starts the count`() {
-        assertEquals(ReviewRecord(firstDay = day0, lastDay = day0, openingDays = 1), openedOn(0))
+        assertEquals(ReviewRecord(firstDay = day0, days = setOf(day0)), openedOn(0))
     }
 
     @Test fun `several openings on one day count once`() {
@@ -20,8 +20,19 @@ class ReviewPolicyTest {
         assertEquals(2, openedOn(0, 0, 1, 1).openingDays)
     }
 
-    @Test fun `a clock set back still counts the day`() {
+    @Test fun `a clock set back still counts a new day`() {
         assertEquals(3, openedOn(5, 3, 4).openingDays)
+    }
+
+    @Test fun `a day seen again does not count twice`() {
+        // Eight different dates, ten openings on changing days (time zone, clock): not enough.
+        val revisited = openedOn(0, 1, 2, 3, 4, 5, 6, 7, 6, 7)
+        assertEquals(8, revisited.openingDays)
+        assertFalse(ReviewPolicy.due(revisited, day0 + 7, versionCode = 1))
+    }
+
+    @Test fun `the count stops growing at the threshold`() {
+        assertEquals(ReviewPolicy.MIN_OPENING_DAYS, openedOn(*LongArray(30) { it.toLong() }).openingDays)
     }
 
     @Test fun `due after seven days and ten opening days, not before`() {
@@ -39,17 +50,17 @@ class ReviewPolicyTest {
     }
 
     @Test fun `exactly seven days since the first opening is enough`() {
-        val record = ReviewRecord(firstDay = day0, lastDay = day0 + 7, openingDays = 10)
+        val record = ReviewRecord(firstDay = day0, days = (0L..9L).map { day0 + it }.toSet())
         assertFalse(ReviewPolicy.due(record, day0 + 6, versionCode = 1))
         assertTrue(ReviewPolicy.due(record, day0 + 7, versionCode = 1))
     }
 
     @Test fun `never due before the first opening`() {
-        assertFalse(ReviewPolicy.due(ReviewRecord(openingDays = 99), day0, versionCode = 1))
+        assertFalse(ReviewPolicy.due(ReviewRecord(days = (1L..20L).toSet()), day0, versionCode = 1))
     }
 
     @Test fun `at most once per version, again after an update`() {
-        val met = ReviewRecord(firstDay = day0, lastDay = day0 + 20, openingDays = 12)
+        val met = ReviewRecord(firstDay = day0, days = (0L..9L).map { day0 + it * 2 }.toSet())
         val asked = ReviewPolicy.asked(met, versionCode = 13, at = 1L, fake = false)
         assertFalse(ReviewPolicy.due(asked, day0 + 21, versionCode = 13))
         assertTrue(ReviewPolicy.due(asked, day0 + 21, versionCode = 14))

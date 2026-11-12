@@ -6,8 +6,9 @@ package one.tearoom.review
  * calendar on the phone, not by 24-hour spans.
  *
  * @param firstDay the day of the first counted opening; null before it.
- * @param lastDay the day of the last counted opening, so a second opening on the same day is not counted.
- * @param openingDays how many different days the app came to the foreground.
+ * @param days the different days the app came to the foreground, kept until there are
+ *   [ReviewPolicy.MIN_OPENING_DAYS] of them; a day seen again (a second opening, a clock set back to a
+ *   day already counted) does not count twice.
  * @param askedVersion the versionCode the prompt was last asked for; at most once per version.
  * @param lastPromptAt when the prompt was last asked (epoch millis), for the debug line.
  * @param lastPromptFake whether that prompt went to `FakeReviewManager` (a forced prompt of a test build).
@@ -15,13 +16,15 @@ package one.tearoom.review
  */
 data class ReviewRecord(
     val firstDay: Long? = null,
-    val lastDay: Long? = null,
-    val openingDays: Int = 0,
+    val days: Set<Long> = emptySet(),
     val askedVersion: Long? = null,
     val lastPromptAt: Long? = null,
     val lastPromptFake: Boolean = false,
     val forced: Boolean = false,
-)
+) {
+    /** How many different days the app came to the foreground, up to [ReviewPolicy.MIN_OPENING_DAYS]. */
+    val openingDays: Int get() = days.size
+}
 
 /**
  * The one rule of every app (user decision, 11 November 2026): at least [MIN_DAYS] days since the
@@ -32,12 +35,12 @@ object ReviewPolicy {
     const val MIN_DAYS = 7
     const val MIN_OPENING_DAYS = 10
 
-    /** The app came to the foreground on [today]; counts the day once. */
+    /** The app came to the foreground on [today]; counts each day once. */
     fun opened(record: ReviewRecord, today: Long): ReviewRecord = when {
-        record.firstDay == null -> record.copy(firstDay = today, lastDay = today, openingDays = 1)
-        record.lastDay == today -> record
-        // Any other day counts, a clock set back as well: a few extra days are harmless, a lost one is not.
-        else -> record.copy(lastDay = today, openingDays = record.openingDays + 1)
+        record.firstDay == null -> record.copy(firstDay = today, days = setOf(today))
+        // Enough days counted: the set stops growing, the rule only asks for the threshold.
+        today in record.days || record.openingDays >= MIN_OPENING_DAYS -> record
+        else -> record.copy(days = record.days + today)
     }
 
     /** The rule is met for [versionCode] on [today], or a test build forced the next prompt. */

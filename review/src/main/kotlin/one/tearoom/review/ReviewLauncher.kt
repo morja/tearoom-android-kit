@@ -8,18 +8,23 @@ import com.google.android.play.core.review.testing.FakeReviewManager
 
 /**
  * The one call to Google Play, behind an interface so the rule is tested without Play. [launch]
- * reports whether Play accepted the request; Play never tells whether the dialog showed or a rating
- * was given, and throttles on its own.
+ * requests the flow and, when Play answers, shows it only if [wanted] still holds (the request takes a
+ * moment; the user may have left the screen or the app meanwhile). It reports whether the flow was
+ * shown; Play never tells whether the dialog appeared or a rating was given, and throttles on its own.
  */
 fun interface ReviewLauncher {
-    fun launch(activity: Activity, done: (accepted: Boolean) -> Unit)
+    fun launch(activity: Activity, wanted: () -> Boolean, done: (shown: Boolean) -> Unit)
 }
 
-/** Requests a review flow and launches it; `requestReviewFlow` failing (no Play, offline) is not accepted. */
+/**
+ * Requests a review flow and launches it; `requestReviewFlow` failing (no Play, offline) or the screen
+ * no longer wanting it when Play answers is not shown.
+ */
 internal class PlayReviewLauncher(private val manager: ReviewManager) : ReviewLauncher {
-    override fun launch(activity: Activity, done: (accepted: Boolean) -> Unit) {
+    override fun launch(activity: Activity, wanted: () -> Boolean, done: (shown: Boolean) -> Unit) {
+        // Task listeners run on the main thread, like the lifecycle that decides [wanted].
         manager.requestReviewFlow().addOnCompleteListener { request ->
-            if (!request.isSuccessful) {
+            if (!request.isSuccessful || !wanted()) {
                 done(false)
                 return@addOnCompleteListener
             }

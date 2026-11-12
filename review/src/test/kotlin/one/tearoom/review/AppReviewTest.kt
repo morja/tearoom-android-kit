@@ -33,13 +33,30 @@ class AppReviewTest {
     private var date = LocalDate.of(2026, 11, 11)
     private var accept = true
     private val launches = mutableListOf<Boolean>()
+
+    /** Play's answers not yet given, when [deferred]: Play answers the request after a moment. */
+    private var deferred = false
+    private val pending = mutableListOf<() -> Unit>()
     private lateinit var controller: ActivityController<ComponentActivity>
     private lateinit var activity: ComponentActivity
 
     private fun review(config: ReviewConfig = ReviewConfig(calmFor = Duration.ZERO)) =
         AppReview(config, { date }, { 1_000L }) { _, fake ->
-            ReviewLauncher { _, done -> launches += fake; done(accept) }
+            // Like PlayReviewLauncher: a refused request or a screen that no longer wants it shows nothing.
+            ReviewLauncher { _, wanted, done ->
+                val answer = {
+                    if (!accept || !wanted()) done(false)
+                    else { launches += fake; done(true) }
+                }
+                if (deferred) pending += answer else answer()
+            }
         }
+
+    /** Play answers every request still open. */
+    private fun answer() {
+        pending.toList().also { pending.clear() }.forEach { it() }
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 
     @Before fun prepare() {
         app.getSharedPreferences("one.tearoom.review", Context.MODE_PRIVATE).edit().clear().commit()
@@ -144,6 +161,53 @@ class AppReviewTest {
         controller.pause().stop().restart().resume()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(2, launches.size)
+    }
+
+    @Test fun `leaving the calm screen while Play answers shows nothing and keeps the prompt`() {
+        val review = review()
+        deferred = true
+        review.forceNext(app)
+        val job = CoroutineScope(Dispatchers.Main.immediate).launch { review.askIfDue(activity) }
+        controller.start().resume()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, pending.size)
+
+        // The screen is no longer calm (another screen, an error) before Play's answer arrives.
+        job.cancel()
+        answer()
+        assertTrue(launches.isEmpty())
+        assertTrue(review.isDue(app))
+    }
+
+    @Test fun `a pause while Play answers leaves only the newer try to show`() {
+        val review = review()
+        deferred = true
+        review.forceNext(app)
+        val job = CoroutineScope(Dispatchers.Main.immediate).launch { review.askIfDue(activity) }
+        controller.start().resume()
+        shadowOf(Looper.getMainLooper()).idle()
+        controller.pause().resume()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(2, pending.size)
+
+        answer()
+        assertEquals(listOf(true), launches)
+        assertFalse(review.isDue(app))
+        job.cancel()
+    }
+
+    @Test fun `paused when Play answers, nothing is shown`() {
+        val review = review()
+        deferred = true
+        review.forceNext(app)
+        val job = CoroutineScope(Dispatchers.Main.immediate).launch { review.askIfDue(activity) }
+        controller.start().resume()
+        shadowOf(Looper.getMainLooper()).idle()
+        controller.pause()
+        answer()
+        assertTrue(launches.isEmpty())
+        assertTrue(review.isDue(app))
+        job.cancel()
     }
 
     @Test fun `the debug receiver forces, resets and answers with the status line`() {

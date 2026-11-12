@@ -9,8 +9,7 @@ import android.content.Context
 internal object ReviewStore {
     private const val FILE = "one.tearoom.review"
     private const val FIRST_DAY = "first_day"
-    private const val LAST_DAY = "last_day"
-    private const val OPENING_DAYS = "opening_days"
+    private const val DAYS = "days"
     private const val ASKED_VERSION = "asked_version"
     private const val LAST_PROMPT_AT = "last_prompt_at"
     private const val LAST_PROMPT_FAKE = "last_prompt_fake"
@@ -23,8 +22,7 @@ internal object ReviewStore {
         fun long(key: String) = if (p.contains(key)) p.getLong(key, 0) else null
         return ReviewRecord(
             firstDay = long(FIRST_DAY),
-            lastDay = long(LAST_DAY),
-            openingDays = p.getInt(OPENING_DAYS, 0),
+            days = p.getStringSet(DAYS, null).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
             askedVersion = long(ASKED_VERSION),
             lastPromptAt = long(LAST_PROMPT_AT),
             lastPromptFake = p.getBoolean(LAST_PROMPT_FAKE, false),
@@ -36,8 +34,7 @@ internal object ReviewStore {
         prefs(context).edit().apply {
             clear()
             record.firstDay?.let { putLong(FIRST_DAY, it) }
-            record.lastDay?.let { putLong(LAST_DAY, it) }
-            putInt(OPENING_DAYS, record.openingDays)
+            putStringSet(DAYS, record.days.mapTo(HashSet()) { it.toString() })
             record.askedVersion?.let { putLong(ASKED_VERSION, it) }
             record.lastPromptAt?.let { putLong(LAST_PROMPT_AT, it) }
             putBoolean(LAST_PROMPT_FAKE, record.lastPromptFake)

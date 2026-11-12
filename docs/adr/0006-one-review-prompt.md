@@ -18,8 +18,9 @@ dependency `com.google.android.play:review` waits for his acceptance of this ADR
   (launcher, widget, notification). When the rule is met, the next opening asks once the main screen
   is calm for about 2 s, never while an error, a permission request, a purchase or onboarding is on
   screen; the app says what calm means, the kit waits and cancels.
-- At most once per versionCode. The prompt counts as asked when Play accepts the request; without
-  Play or network the next opening tries again. Play throttles on top and never says whether the
+- At most once per versionCode. The prompt counts as asked when Play's flow is shown. Play answers the
+  request after a moment; if the screen is no longer calm, the activity paused or a newer try started by
+  then, nothing is shown. Without Play or network the next opening tries again. Play throttles on top and never says whether the
   dialog showed or a rating was given.
 - No own pre-question, no routing of unhappy users, no reward (Google's policy).
 - Test builds force the next prompt through `FakeReviewManager` and reset the counter, from the
