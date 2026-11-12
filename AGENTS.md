@@ -73,5 +73,4 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
 
 - `scripts/check` – unit tests of all six modules, lint and release builds of the five Android ones.
 
-Agents work on branches, commit their own work and merge it into `main` here when it is not critical
-(ask first when a decision of Mathis is open, for a larger rebuild, or when he should check something). They never push, merge into another repo or publish.
+Agents work on branches. Committing, merging and pushing follow the global rules. They never merge into another repo and never publish.
