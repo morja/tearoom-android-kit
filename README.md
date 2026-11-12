@@ -208,13 +208,16 @@ LaunchedEffect(calm) { if (calm) Review.askIfDue(activity) }
 SettingsRow(stringResource(R.string.rate_app), onClick = { Review.openListing(context) })
 ```
 
-- The rule is the same in every app (ADR-0006): at least 7 days since the first opening and the app
-  opened on at least 10 different local calendar days, at most once per versionCode. `ReviewPolicy`
+- The rule is the same in every app (ADR-0006): the first prompt after at least 7 days since the first
+  opening and 10 different local calendar days with an opening; the second at least 90 days and 30
+  opening days after it; every later one at least 365 days and 30 opening days after the last; always
+  at most once per versionCode. `ReviewPolicy`
   holds it as pure functions; the record lives in the kit's preferences file `one.tearoom.review`.
 - `askIfDue` tries on every resume while the screen stays calm (a return from the background is the
   next opening): it waits `ReviewConfig.calmFor` (2 s) and asks only if the activity is still resumed
-  and the rule still holds; leaving the calm state or a pause cancels the wait. The prompt counts as asked only when
-  Play accepts the request; Play throttles on its own and never says whether the dialog showed.
+  and the rule still holds; leaving the calm state or a pause cancels the wait. Play answers the request after a
+  moment; the flow shows only if that try is still wanted then, and only a shown flow counts as asked.
+  Play throttles on its own and never says whether the dialog showed or someone rated.
 - `openListing` opens `market://details?id=…`, else the web page; false when neither opens. Builds
   with an id suffix pass `playPackage`.
 - Test builds: `Review.forceNext(context)` prompts at the next calm moment through

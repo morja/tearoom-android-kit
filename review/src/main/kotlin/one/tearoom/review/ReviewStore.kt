@@ -10,6 +10,8 @@ internal object ReviewStore {
     private const val FILE = "one.tearoom.review"
     private const val FIRST_DAY = "first_day"
     private const val DAYS = "days"
+    private const val ASKED_DAY = "asked_day"
+    private const val PROMPTS = "prompts"
     private const val ASKED_VERSION = "asked_version"
     private const val LAST_PROMPT_AT = "last_prompt_at"
     private const val LAST_PROMPT_FAKE = "last_prompt_fake"
@@ -23,6 +25,8 @@ internal object ReviewStore {
         return ReviewRecord(
             firstDay = long(FIRST_DAY),
             days = p.getStringSet(DAYS, null).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
+            askedDay = long(ASKED_DAY),
+            prompts = p.getInt(PROMPTS, 0),
             askedVersion = long(ASKED_VERSION),
             lastPromptAt = long(LAST_PROMPT_AT),
             lastPromptFake = p.getBoolean(LAST_PROMPT_FAKE, false),
@@ -35,6 +39,8 @@ internal object ReviewStore {
             clear()
             record.firstDay?.let { putLong(FIRST_DAY, it) }
             putStringSet(DAYS, record.days.mapTo(HashSet()) { it.toString() })
+            record.askedDay?.let { putLong(ASKED_DAY, it) }
+            putInt(PROMPTS, record.prompts)
             record.askedVersion?.let { putLong(ASKED_VERSION, it) }
             record.lastPromptAt?.let { putLong(LAST_PROMPT_AT, it) }
             putBoolean(LAST_PROMPT_FAKE, record.lastPromptFake)

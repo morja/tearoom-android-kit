@@ -16,7 +16,8 @@ data class ReviewStatus(val record: ReviewRecord, val today: Long, val versionCo
     val due: Boolean get() = ReviewPolicy.due(record, today, versionCode)
 
     fun describe(): String {
-        val days = record.firstDay?.let { today - it } ?: 0
+        val days = ReviewPolicy.daysWaited(record, today)
+        val since = if (record.prompts == 0) "days" else "days since prompt ${record.prompts}"
         val asked = record.askedVersion?.toString() ?: "—"
         val last = record.lastPromptAt?.let {
             SimpleDateFormat("d MMM HH:mm", Locale.ENGLISH).format(Date(it)) + if (record.lastPromptFake) " (fake)" else ""
@@ -26,7 +27,8 @@ data class ReviewStatus(val record: ReviewRecord, val today: Long, val versionCo
             due -> "due"
             else -> "not due"
         }
-        return "$days of ${ReviewPolicy.MIN_DAYS} days · ${record.openingDays} of ${ReviewPolicy.MIN_OPENING_DAYS} opening days · " +
+        return "$days of ${ReviewPolicy.daysNeeded(record)} $since · " +
+            "${record.openingDays} of ${ReviewPolicy.openingDaysNeeded(record)} opening days · " +
             "asked for version $asked (now $versionCode) · last prompt $last · $state"
     }
 }

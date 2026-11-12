@@ -101,6 +101,7 @@ class AppReviewTest {
         assertEquals(listOf(false), launches)
         assertEquals(AppReview.versionCode(app), review.status(app).record.askedVersion)
         assertEquals(1_000L, review.status(app).record.lastPromptAt)
+        assertEquals(date.toEpochDay(), review.status(app).record.askedDay)
 
         // The next opening of the same version stays quiet.
         assertFalse(review.askOnce(activity))

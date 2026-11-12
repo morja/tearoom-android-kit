@@ -1,7 +1,7 @@
 # ADR-0006 · One rating prompt for every app
 
-Status: proposed, 11 November 2026 (rule and API decided by Mathis on 11 November 2026; the new
-dependency `com.google.android.play:review` waits for his acceptance of this ADR, AGENTS.md rule 5).
+Status: accepted, 12 November 2026 (rule and API decided by Mathis on 11 November 2026, the waits
+for later prompts and the acceptance on 12 November 2026; REV-5 reviewed the first version).
 
 ## Decision
 
@@ -13,12 +13,16 @@ dependency `com.google.android.play:review` waits for his acceptance of this ADR
 - Google Play In-App Review API (`com.google.android.play:review` 2.0.2, plain, not `review-ktx`, as
   with Billing), plus a permanent "Rate the app" row in every app that opens the Play listing
   (`market://`, else the web page).
-- The rule, identical for all apps: at least 7 days since the first opening and the app opened on at
-  least 10 different local calendar days. An opening is the main activity coming to the foreground
+- The rule, identical for all apps. The first prompt: at least 7 days since the first opening and the
+  app opened on at least 10 different local calendar days (ten days already span nine; the 7 days stay
+  as the floor if the number of days changes). The second: at least 90 days and 30 opening days after
+  the first. Every later one: at least 365 days and 30 opening days after the last, as Apple allows for
+  someone who already rated. The app never learns whether someone rated, so the waits are made for
+  them. An opening is the main activity coming to the foreground
   (launcher, widget, notification). When the rule is met, the next opening asks once the main screen
   is calm for about 2 s, never while an error, a permission request, a purchase or onboarding is on
   screen; the app says what calm means, the kit waits and cancels.
-- At most once per versionCode. The prompt counts as asked when Play's flow is shown. Play answers the
+- Always at most once per versionCode as well. The prompt counts as asked when Play's flow is shown. Play answers the
   request after a moment; if the screen is no longer calm, the activity paused or a newer try started by
   then, nothing is shown. Without Play or network the next opening tries again. Play throttles on top and never says whether the
   dialog showed or a rating was given.

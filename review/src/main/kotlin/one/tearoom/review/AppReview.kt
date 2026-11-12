@@ -114,7 +114,7 @@ class AppReview internal constructor(
             launcher(activity, fake).launch(activity, wanted) { shown ->
                 // Marked right away, before Play's dialog pauses the activity and cancels the wait. Only when the flow
                 // was shown: no Play, no network or a screen no longer calm tries again on the next opening.
-                if (shown) ReviewStore.update(activity) { ReviewPolicy.asked(it, versionCode(activity), now(), fake) }
+                if (shown) ReviewStore.update(activity) { ReviewPolicy.asked(it, versionCode(activity), today().toEpochDay(), now(), fake) }
                 if (cont.isActive) cont.resume(shown)
             }
         }
