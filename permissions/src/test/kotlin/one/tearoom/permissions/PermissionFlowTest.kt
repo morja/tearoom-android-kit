@@ -532,6 +532,91 @@ class PermissionFlowTest {
     }
 
     /** A device whose grants, rationales, clock and marks the test sets. */
+    private val listener = AppPermission(PermissionKind.NotificationListener("app.Listener"), texts)
+
+    @Test fun `notification access, the reason, then its settings page instead of a dialog, granted on the way back`() {
+        val flow = flow(listener)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+
+        flow.start()
+        assertEquals(PermissionAsk.REASON, flow.state.value.ask)
+
+        flow.proceed()
+        assertNull(device.launched)
+        assertEquals(listener.kind, device.settingsOpenedFor)
+        assertTrue(flow.state.value.busy)
+        assertTrue(results.isEmpty())
+
+        flow.paused()
+        device.access += listener.kind
+        flow.refresh()
+        assertEquals(PermissionStatus.GRANTED, flow.state.value.status)
+        assertFalse(flow.state.value.busy)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `notification access left off in the settings, not asked again, never blocked, the next tap explains again`() {
+        val flow = flow(listener)
+        repeat(3) {
+            flow.start()
+            assertEquals(PermissionAsk.REASON, flow.state.value.ask)
+            flow.proceed()
+            flow.paused()
+            flow.refresh()
+            assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+            assertNull(flow.state.value.ask)
+            assertFalse(flow.state.value.busy)
+        }
+        assertEquals(3, results.size)
+        assertTrue(results.none { it.usable })
+        assertNull(device.launched)
+        assertFalse(device.marked(listener.kind))
+    }
+
+    @Test fun `notification access on the screen's own reason opens the page at once`() {
+        val flow = flow(AppPermission(PermissionKind.NotificationListener("app.Listener"), texts, explain = Explain.SCREEN))
+        flow.start()
+        assertNull(flow.state.value.ask)
+        assertEquals(PermissionKind.NotificationListener("app.Listener"), device.settingsOpenedFor)
+    }
+
+    @Test fun `notification access already on, the feature runs at once`() {
+        device.access += listener.kind
+        val flow = flow(listener)
+        flow.start()
+        assertNull(device.settingsOpenedFor)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `notification access turned off later, the resume shows it, the hint asks again`() {
+        device.access += listener.kind
+        val flow = flow(listener)
+        assertTrue(flow.state.value.usable)
+
+        device.access.clear()
+        flow.paused()
+        flow.refresh()
+        assertFalse(flow.state.value.usable)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertEquals(texts.reason, flow.state.value.textRes(texts))
+        assertTrue(results.isEmpty())
+    }
+
+    @Test fun `notification access, a rotation in the settings, the return still answers`() {
+        val first = flow(listener)
+        first.start()
+        first.proceed()
+        val saved = first.save()
+
+        val rebuilt = flow(listener)
+        rebuilt.restore(saved)
+        assertTrue(rebuilt.state.value.busy)
+        device.access += listener.kind
+        rebuilt.refresh()
+        assertTrue(rebuilt.state.value.usable)
+        assertTrue(results.single().usable)
+    }
+
     class FakeDevice : PermissionPlatform {
         override var sdk = 34
         private val granted = mutableSetOf<String>()
@@ -541,6 +626,9 @@ class PermissionFlowTest {
         var settingsOpenedFor: PermissionKind? = null
 
         fun grant(vararg permissions: String) = granted.addAll(permissions)
+
+        /** The special app accesses switched on in the settings. */
+        val access = mutableSetOf<PermissionKind>()
         fun revokeAll() = granted.clear()
         fun mark(stage: PermissionKind) = marks.add(stage.permissions(sdk).first())
         fun marked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
@@ -555,6 +643,7 @@ class PermissionFlowTest {
         var option = "Allow all the time"
 
         override fun isGranted(permission: String) = permission in granted
+        override fun hasAccess(stage: PermissionKind) = stage in access
         override fun showsRationale(permission: String) = permission in rationale
         override fun isMarkedBlocked(stage: PermissionKind) = stage.permissions(sdk).firstOrNull() in marks
         override fun markBlocked(stage: PermissionKind, blocked: Boolean) {

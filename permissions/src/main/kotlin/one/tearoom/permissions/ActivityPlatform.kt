@@ -30,6 +30,8 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
 
     override fun showsRationale(permission: String) = activity.shouldShowRequestPermissionRationale(permission)
 
+    override fun hasAccess(stage: PermissionKind) = SpecialAccess.isOn(activity, stage)
+
     private val marks get() = activity.getSharedPreferences(MARKS, Context.MODE_PRIVATE)
 
     override fun isMarkedBlocked(stage: PermissionKind) = key(stage)?.let { marks.getBoolean(it, false) } ?: false
@@ -64,15 +66,20 @@ object PermissionSettings {
      */
     fun intent(context: Context, stage: PermissionKind): Intent = when (stage) {
         PermissionKind.Notifications -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        is PermissionKind.NotificationListener -> SpecialAccess.listenerIntent(context, stage)
         else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
     }
 
     /**
      * Opens [intent]; from an activity on top of it, so back returns to the screen. The activity is
      * found through wrappers (an app's themed or localised Compose context); only without one does
-     * the page open in a task of its own.
+     * the page open in a task of its own. Where the notification listener's own page is missing (a
+     * system without it), the list of all notification listeners opens instead.
      */
-    fun open(context: Context, stage: PermissionKind) = start(context, intent(context, stage))
+    fun open(context: Context, stage: PermissionKind) {
+        if (start(context, intent(context, stage))) return
+        if (stage is PermissionKind.NotificationListener) start(context, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    }
 
     /**
      * The page of one notification channel of the app, with its switch, sound and vibration. Android
@@ -84,12 +91,15 @@ object PermissionSettings {
         .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
 
     /** Opens [channelIntent], on top of the activity like [open]. */
-    fun openChannel(context: Context, channelId: String) = start(context, channelIntent(context, channelId))
+    fun openChannel(context: Context, channelId: String) {
+        start(context, channelIntent(context, channelId))
+    }
 
-    private fun start(context: Context, intent: Intent) {
+    /** Starts [intent]; false when no activity takes it. */
+    private fun start(context: Context, intent: Intent): Boolean {
         val activity = context.activity()
         if (activity == null) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { (activity ?: context).startActivity(intent) }
+        return runCatching { (activity ?: context).startActivity(intent) }.isSuccess
     }
 
     private tailrec fun Context.activity(): Activity? = when (this) {
@@ -105,6 +115,8 @@ object PermissionSettings {
      */
     fun option(context: Context, stage: PermissionKind): String = when (stage) {
         is PermissionKind.BackgroundLocation -> backgroundOptionLabel(context)
+        // A special app access is never blocked, so no settings path names an option for it.
+        is PermissionKind.NotificationListener -> ""
         else -> groupLabel(context, stage)
     }
 
@@ -148,6 +160,7 @@ object PermissionSettings {
             PermissionKind.Microphone -> "MICROPHONE"
             PermissionKind.PhysicalActivity -> "ACTIVITY_RECOGNITION"
             is PermissionKind.NearbyDevices -> if (sdk >= 31) "NEARBY_DEVICES" else "LOCATION"
+            is PermissionKind.NotificationListener -> return ""
             is PermissionKind.Media -> when {
                 sdk < 33 -> "STORAGE"
                 stage.images || stage.video -> "READ_MEDIA_VISUAL"

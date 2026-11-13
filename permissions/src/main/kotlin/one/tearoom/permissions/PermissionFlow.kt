@@ -13,6 +13,9 @@ interface PermissionPlatform {
     val sdk: Int
     fun isGranted(permission: String): Boolean
 
+    /** A special app access ([PermissionKind.settingsOnly]) is switched on in Android's settings. False on a device that knows none. */
+    fun hasAccess(stage: PermissionKind): Boolean = false
+
     /** Android would explain the permission: it asked once and was refused. */
     fun showsRationale(permission: String): Boolean
 
@@ -20,7 +23,10 @@ interface PermissionPlatform {
     fun isMarkedBlocked(stage: PermissionKind): Boolean
     fun markBlocked(stage: PermissionKind, blocked: Boolean)
 
-    /** Opens the system dialog (for the background location on Android 11+ its settings page). The answer comes to [PermissionFlow.onAnswer]. */
+    /**
+     * Opens the system dialog (for the background location on Android 11+ its settings page). The answer
+     * comes to [PermissionFlow.onAnswer]. Never called for a special app access: its page opens through [openSettings].
+     */
     fun launch(permissions: List<String>)
 
     /** Opens the page in Android's settings where [stage] is changed. */
@@ -222,6 +228,11 @@ class PermissionFlow(
     }
 
     private fun launch(current: PermissionState) {
+        // A special app access has no dialog: its settings page stands in for it, the resume reads the answer (ADR-0007).
+        if (current.stage.settingsOnly) {
+            openSettings()
+            return
+        }
         val wanted = current.stage.permissions(platform.sdk)
         rationaleBefore = wanted.any(platform::showsRationale)
         markedBefore = platform.isMarkedBlocked(current.stage)
@@ -266,7 +277,8 @@ class PermissionFlow(
         val sdk = platform.sdk
         val granted = permission.granted(platform)
         val stage = PermissionPolicy.stage(permission.kind, granted, sdk)
-        val rationale = stage.permissions(sdk).filter(platform::showsRationale).toSet()
+        // A special app access has no rationale and no block: only on or off.
+        val rationale = if (stage.settingsOnly) emptySet() else stage.permissions(sdk).filter(platform::showsRationale).toSet()
         val marked = platform.isMarkedBlocked(stage)
         val status = PermissionPolicy.status(stage, granted, rationale, marked, sdk)
         // A mark from before a grant in the settings, or before Android asks again, is stale.
@@ -319,4 +331,7 @@ data class SavedFlow(
 
 /** Everything granted of all steps, as the platform sees it now. */
 internal fun AppPermission.granted(platform: PermissionPlatform): Set<String> =
-    steps(platform.sdk).flatMap { it.permissions(platform.sdk) }.filter(platform::isGranted).toSet()
+    steps(platform.sdk).flatMap { step ->
+        // A special app access stands in the set under the kit's key while Android has it switched on.
+        step.permissions(platform.sdk).filter { if (step.settingsOnly) platform.hasAccess(step) else platform.isGranted(it) }
+    }.toSet()

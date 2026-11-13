@@ -205,6 +205,52 @@ class ActivityPlatformTest {
         assertTrue(rebuilt.results.single().usable)
     }
 
+    private val listenerKind = PermissionKind.NotificationListener("app.Listener")
+    private val listenerComponent get() = android.content.ComponentName(app.packageName, "app.Listener")
+    private val notifications get() = shadowOf(app.getSystemService(android.app.NotificationManager::class.java))
+
+    @Test fun `notification access opens the listener's own page for the app's component, no dialog`() {
+        val flow = flow(AppPermission(listenerKind, texts, explain = Explain.SCREEN))
+        flow.start()
+        assertNull(registry.launched)
+        val intent = shadowOf(activity).nextStartedActivity
+        assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS, intent.action)
+        assertEquals(listenerComponent.flattenToString(), intent.getStringExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME))
+        assertEquals(0, intent.flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    @Test
+    @Config(sdk = [29])
+    fun `before Android 11 notification access opens the list of listeners`() {
+        val intent = PermissionSettings.intent(app, listenerKind)
+        assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, intent.action)
+    }
+
+    @Test fun `notification access is read from Android on the way back and again when it is turned off`() {
+        val flow = flow(AppPermission(listenerKind, texts, explain = Explain.SCREEN))
+        val access = AppPermission(listenerKind, texts)
+        assertFalse(access.isUsable(app))
+        flow.start()
+        controller.pause()
+
+        notifications.setNotificationListenerAccessGranted(listenerComponent, true)
+        controller.resume()
+        assertTrue(flow.state.value.usable)
+        assertTrue(results.single().usable)
+        assertTrue(access.isUsable(app))
+        assertTrue(access.isGranted(app))
+
+        notifications.setNotificationListenerAccessGranted(listenerComponent, false)
+        controller.pause().resume()
+        assertFalse(flow.state.value.usable)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertFalse(access.isUsable(app))
+    }
+
+    @Test fun `notification access names no option`() {
+        assertEquals("", PermissionSettings.option(app, listenerKind))
+    }
+
     /** Records what the flow launches and hands back the test's answer. */
     class TestRegistry : ActivityResultRegistry() {
         var launched: List<String>? = null

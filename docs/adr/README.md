@@ -8,3 +8,4 @@
 | [0004](0004-flows-in-the-kit-surfaces-in-the-apps.md) | Flows in the kit, surfaces in the apps | accepted |
 | [0005](0005-one-permission-flow.md) | One permission flow for every app | accepted |
 | [0006](0006-one-review-prompt.md) | One rating prompt for every app | accepted |
+| [0007](0007-special-app-access.md) | Special app access in the permission flow: notification access | accepted |

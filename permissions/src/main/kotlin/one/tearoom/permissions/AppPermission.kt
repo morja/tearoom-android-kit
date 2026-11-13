@@ -69,7 +69,9 @@ class AppPermission(
     internal fun steps(sdk: Int): List<PermissionKind> = listOfNotNull(kind.first(sdk), kind)
 
     internal fun granted(context: Context, sdk: Int): Set<String> =
-        steps(sdk).flatMap { it.permissions(sdk) }
-            .filter { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-            .toSet()
+        steps(sdk).flatMap { step ->
+            step.permissions(sdk).filter {
+                if (step.settingsOnly) SpecialAccess.isOn(context, step) else context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+            }
+        }.toSet()
 }

@@ -23,6 +23,14 @@ sealed class PermissionKind {
     /** Whether a [partial] grant is enough for the feature. */
     open val partialUsable: Boolean get() = true
 
+    /**
+     * A special app access rather than a runtime permission (ADR-0007): Android grants it on a page of
+     * its settings, with no dialog, no rationale and no block. The flow opens that page where it would
+     * open the dialog and reads the access again on the way back. [permissions] then holds one key of
+     * the kit, not a manifest permission, so the rules over granted sets stay the same.
+     */
+    open val settingsOnly: Boolean get() = false
+
     /** The device location while the app is in use. */
     data class Location(val precision: Precision = Precision.APPROXIMATE) : PermissionKind() {
         override fun permissions(sdk: Int) =
@@ -120,7 +128,26 @@ sealed class PermissionKind {
         override fun permissions(sdk: Int) = if (sdk >= 29) listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList()
     }
 
-    private companion object {
+    /**
+     * Reading the notifications and the media sessions of other apps through the app's own
+     * `NotificationListenerService` ([service], its fully qualified class name; the package is the
+     * app's). A special app access ([settingsOnly]): the reason, then the notification-access page of
+     * Android's settings for that component, then the state read again on every resume. It is never
+     * refused or blocked, only on or off, and the user may turn it off at any time (ADR-0007).
+     */
+    data class NotificationListener(val service: String) : PermissionKind() {
+        init {
+            require(service.isNotBlank()) { "NotificationListener needs the class name of the app's NotificationListenerService" }
+        }
+
+        override fun permissions(sdk: Int) = listOf(NOTIFICATION_LISTENER)
+        override val settingsOnly: Boolean get() = true
+    }
+
+    internal companion object {
+        /** The kit's key for the notification-listener access in granted sets; no manifest permission has this name. */
+        const val NOTIFICATION_LISTENER = "one.tearoom.permissions.access.NOTIFICATION_LISTENER"
+
         const val COARSE = Manifest.permission.ACCESS_COARSE_LOCATION
         const val FINE = Manifest.permission.ACCESS_FINE_LOCATION
         const val BACKGROUND = Manifest.permission.ACCESS_BACKGROUND_LOCATION

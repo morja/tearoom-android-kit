@@ -36,7 +36,7 @@ and in the app module:
 ```kotlin
 implementation("one.tearoom:unlock:1.1.1")
 implementation("one.tearoom:unlock-ui:1.1.1") // the default purchase sheet; apps with their own surface skip it
-implementation("one.tearoom:permissions:1.0.0")
+implementation("one.tearoom:permissions:1.1.0")
 implementation("one.tearoom:permissions-ui:1.0.0") // the default permission sheet and hint; the same rule
 implementation("one.tearoom:review:1.0.0") // the rating prompt and the listing for the settings row
 testImplementation("one.tearoom:testing:1.0.0")
@@ -162,8 +162,14 @@ private val location = DeviceLocation.request(this) { if (it.usable) startRecord
 - Kinds: `Location(precision)` (approximate; precise with approximate accepted; precise required),
   `BackgroundLocation(precision)` with `first` as its foreground step, `Notifications`,
   `Media(images, video, audio)`, `NearbyDevices(scan, connect, wifi)`, `Camera`, `Microphone`,
-  `PhysicalActivity`. The kind holds the Android version branches; the app never checks
-  `Build.VERSION` for a permission.
+  `PhysicalActivity`, and since 1.1.0 the special app access `NotificationListener(service)`
+  (ADR-0007). The kind holds the Android version branches; the app never checks `Build.VERSION` for
+  a permission.
+- Notification access (`NotificationListener(MyListener::class.java.name)`) has no dialog: the reason,
+  then the notification-access page of the app's listener, then the access read again on resume. Its
+  status is `GRANTED` or `NOT_ASKED`, never refused or blocked; a later revoke reads as `NOT_ASKED`,
+  so `PermissionHint` shows the reason and "Allow" again. The app declares the service in its
+  manifest; `blocked` and `openSettings` texts are still required by `PermissionTexts` but never shown.
 - `start()` on the tap that starts the feature: usable, and `onResult` runs at once; otherwise the
   app's reason (`PermissionAsk.REASON`, or straight to the dialog with `Explain.SCREEN` where the
   screen says why), the system dialog, or the settings path (`PermissionAsk.SETTINGS`) once Android
@@ -281,6 +287,9 @@ Since 27 October 2026 no app has its own Play Billing code; since 6 November 202
 
 Since 6 November 2026 all four apps and the Cockpit template run their guardrail tests on `testing`
 (Lazy Moves with a counted baseline for raw sizes).
+
+Since 13 November 2026 LSX Switch asks for notification access through `permissions` 1.1.0 and is the
+reference app for that kind (ADR-0007).
 
 Since 11 November 2026 all four ask for a Play rating through `review` (ADR-0006, proposed):
 

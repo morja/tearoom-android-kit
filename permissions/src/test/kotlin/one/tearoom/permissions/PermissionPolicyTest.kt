@@ -94,4 +94,14 @@ class PermissionPolicyTest {
         assertEquals(Move.DONE, PermissionPolicy.onStart(PermissionStatus.PARTIAL, true, Explain.SHEET))
         assertEquals(Move.LAUNCH, PermissionPolicy.onStart(PermissionStatus.PARTIAL, false, Explain.SHEET))
     }
+
+    @Test fun `a special app access is granted or not asked, never refused or blocked`() {
+        val listener = PermissionKind.NotificationListener("app.Listener")
+        val key = listener.permissions(34).single()
+        assertEquals(PermissionStatus.GRANTED, PermissionPolicy.status(listener, setOf(key), emptySet(), false, 34))
+        assertEquals(PermissionStatus.NOT_ASKED, PermissionPolicy.status(listener, emptySet(), emptySet(), false, 34))
+        assertTrue(PermissionPolicy.usable(listener, setOf(key), 34))
+        assertFalse(PermissionPolicy.usable(listener, emptySet(), 34))
+        assertEquals(listener, PermissionPolicy.stage(listener, emptySet(), 34))
+    }
 }

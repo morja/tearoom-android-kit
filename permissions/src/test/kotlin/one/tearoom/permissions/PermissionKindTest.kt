@@ -102,4 +102,13 @@ class PermissionKindTest {
     fun `media must ask for something`() {
         PermissionKind.Media(images = false)
     }
+
+    @Test fun `notification access is a settings-only kind on every version, under the kit's key`() {
+        val listener = PermissionKind.NotificationListener("app.Listener")
+        assertTrue(listener.settingsOnly)
+        assertEquals(listOf("one.tearoom.permissions.access.NOTIFICATION_LISTENER"), listener.permissions(26))
+        assertEquals(listener.permissions(26), listener.permissions(36))
+        assertFalse(PermissionKind.Notifications.settingsOnly)
+        assertFalse(PermissionKind.Camera.settingsOnly)
+    }
 }
