@@ -111,4 +111,14 @@ class PermissionKindTest {
         assertFalse(PermissionKind.Notifications.settingsOnly)
         assertFalse(PermissionKind.Camera.settingsOnly)
     }
+
+    @Test fun `exact alarms are a settings-only kind from Android 12, nothing before`() {
+        assertTrue(PermissionKind.ExactAlarm.settingsOnly)
+        assertEquals(emptyList<String>(), PermissionKind.ExactAlarm.permissions(30))
+        assertEquals(listOf("one.tearoom.permissions.access.EXACT_ALARM"), PermissionKind.ExactAlarm.permissions(31))
+        assertEquals(PermissionKind.ExactAlarm.permissions(31), PermissionKind.ExactAlarm.permissions(36))
+        // Before Android 12 every app may schedule exact alarms: usable without asking.
+        assertTrue(PermissionPolicy.usable(PermissionKind.ExactAlarm, emptySet(), 30))
+        assertEquals(PermissionStatus.NOT_NEEDED, PermissionPolicy.status(PermissionKind.ExactAlarm, emptySet(), emptySet(), false, 30))
+    }
 }

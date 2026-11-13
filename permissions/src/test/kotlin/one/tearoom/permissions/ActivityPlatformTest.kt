@@ -251,6 +251,52 @@ class ActivityPlatformTest {
         assertEquals("", PermissionSettings.option(app, listenerKind))
     }
 
+    @Test fun `exact alarms open the app's alarms page, no dialog`() {
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        val flow = flow(AppPermission(PermissionKind.ExactAlarm, texts, explain = Explain.SCREEN))
+        flow.start()
+        assertNull(registry.launched)
+        val intent = shadowOf(activity).nextStartedActivity
+        assertEquals(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, intent.action)
+        assertEquals("package:${app.packageName}", intent.dataString)
+        assertEquals(0, intent.flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    @Test fun `exact alarms are read from AlarmManager on the way back and again when turned off`() {
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        val flow = flow(AppPermission(PermissionKind.ExactAlarm, texts, explain = Explain.SCREEN))
+        val access = AppPermission(PermissionKind.ExactAlarm, texts)
+        assertFalse(access.isUsable(app))
+        flow.start()
+        controller.pause()
+
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(true)
+        controller.resume()
+        assertTrue(flow.state.value.usable)
+        assertTrue(results.single().usable)
+        assertTrue(access.isGranted(app))
+
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        controller.pause().resume()
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertFalse(access.isUsable(app))
+    }
+
+    @Test
+    @Config(sdk = [30])
+    fun `before Android 12 exact alarms are on and nothing opens`() {
+        val flow = flow(AppPermission(PermissionKind.ExactAlarm, texts))
+        assertEquals(PermissionStatus.NOT_NEEDED, flow.state.value.status)
+        assertTrue(SpecialAccess.isOn(app, PermissionKind.ExactAlarm))
+        flow.start()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `exact alarms name no option`() {
+        assertEquals("", PermissionSettings.option(app, PermissionKind.ExactAlarm))
+    }
+
     /** Records what the flow launches and hands back the test's answer. */
     class TestRegistry : ActivityResultRegistry() {
         var launched: List<String>? = null

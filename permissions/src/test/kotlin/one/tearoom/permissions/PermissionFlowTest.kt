@@ -617,6 +617,56 @@ class PermissionFlowTest {
         assertTrue(results.single().usable)
     }
 
+    private val alarm = AppPermission(PermissionKind.ExactAlarm, texts)
+
+    @Test fun `exact alarms, the reason, then the alarms page instead of a dialog, granted on the way back`() {
+        val flow = flow(alarm)
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+
+        flow.start()
+        assertEquals(PermissionAsk.REASON, flow.state.value.ask)
+        flow.proceed()
+        assertNull(device.launched)
+        assertEquals(PermissionKind.ExactAlarm, device.settingsOpenedFor)
+        assertTrue(results.isEmpty())
+
+        flow.paused()
+        device.access += PermissionKind.ExactAlarm
+        flow.refresh()
+        assertEquals(PermissionStatus.GRANTED, flow.state.value.status)
+        assertTrue(results.single().usable)
+    }
+
+    @Test fun `exact alarms left off in the settings, not asked, never blocked, revoked later reads the same`() {
+        val flow = flow(alarm)
+        flow.start()
+        flow.proceed()
+        flow.paused()
+        flow.refresh()
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+        assertNull(flow.state.value.ask)
+        assertFalse(results.single().usable)
+        assertFalse(device.marked(PermissionKind.ExactAlarm))
+
+        device.access += PermissionKind.ExactAlarm
+        flow.start()
+        assertTrue(flow.state.value.usable)
+        device.access.clear()
+        flow.paused()
+        flow.refresh()
+        assertEquals(PermissionStatus.NOT_ASKED, flow.state.value.status)
+    }
+
+    @Test fun `before Android 12 exact alarms need nothing, no page opens`() {
+        device.sdk = 30
+        val flow = flow(alarm)
+        assertEquals(PermissionStatus.NOT_NEEDED, flow.state.value.status)
+        flow.start()
+        assertNull(device.settingsOpenedFor)
+        assertNull(device.launched)
+        assertTrue(results.single().usable)
+    }
+
     class FakeDevice : PermissionPlatform {
         override var sdk = 34
         private val granted = mutableSetOf<String>()

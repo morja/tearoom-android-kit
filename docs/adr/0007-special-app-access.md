@@ -55,7 +55,7 @@ page of the settings, at any time. ADR-0005 covers runtime permissions only.
 
 - Other special accesses (exact alarms, usage access, overlay, battery optimisation) can follow as
   further `settingsOnly` kinds with their own page and reader in `SpecialAccess`; each needs an ADR
-  line here or a new ADR.
+  line here or a new ADR. Exact alarms followed in ADR-0008.
 - Android 13 and later restrict notification access for apps installed outside a store session
   (sideloaded from a browser or a file manager): the switch stays grey until the user allows
   restricted settings in App info. Builds installed with adb or from Play are not affected; an app

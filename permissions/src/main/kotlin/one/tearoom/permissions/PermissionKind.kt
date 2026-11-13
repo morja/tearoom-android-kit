@@ -144,9 +144,31 @@ sealed class PermissionKind {
         override val settingsOnly: Boolean get() = true
     }
 
+    /**
+     * Scheduling exact alarms ("Alarms & reminders"), for an alarm the user set for a time, such as a
+     * wake-up alarm through `AlarmManager.setAlarmClock`. A special app access ([settingsOnly]) from
+     * Android 12; before that every app may schedule exact alarms and nothing is asked. The flow shows
+     * the reason, opens the "Alarms & reminders" page for the app and reads the access again on every
+     * resume. Only on or off, never refused or blocked (ADR-0008).
+     *
+     * The app declares `<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />` in
+     * its manifest. Android 14 and later no longer grant it to new installs, so the user switches it on.
+     * Turning it off cancels all of the app's exact alarms; the app schedules them again when the access
+     * comes back, on `AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` and when it next
+     * runs. `USE_EXACT_ALARM`, granted at install but restricted by Google Play to alarm-clock and calendar
+     * apps, is a different way the kit does not cover.
+     */
+    data object ExactAlarm : PermissionKind() {
+        override fun permissions(sdk: Int) = if (sdk >= 31) listOf(EXACT_ALARM) else emptyList()
+        override val settingsOnly: Boolean get() = true
+    }
+
     internal companion object {
         /** The kit's key for the notification-listener access in granted sets; no manifest permission has this name. */
         const val NOTIFICATION_LISTENER = "one.tearoom.permissions.access.NOTIFICATION_LISTENER"
+
+        /** The kit's key for the exact-alarm access in granted sets; not the manifest permission, which Android grants through the page. */
+        const val EXACT_ALARM = "one.tearoom.permissions.access.EXACT_ALARM"
 
         const val COARSE = Manifest.permission.ACCESS_COARSE_LOCATION
         const val FINE = Manifest.permission.ACCESS_FINE_LOCATION

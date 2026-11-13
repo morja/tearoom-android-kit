@@ -104,4 +104,13 @@ class PermissionPolicyTest {
         assertFalse(PermissionPolicy.usable(listener, emptySet(), 34))
         assertEquals(listener, PermissionPolicy.stage(listener, emptySet(), 34))
     }
+
+    @Test fun `exact alarms are granted or not asked from Android 12, not needed before`() {
+        val alarm = PermissionKind.ExactAlarm
+        val key = alarm.permissions(34).single()
+        assertEquals(PermissionStatus.GRANTED, PermissionPolicy.status(alarm, setOf(key), emptySet(), false, 34))
+        assertEquals(PermissionStatus.NOT_ASKED, PermissionPolicy.status(alarm, emptySet(), emptySet(), false, 34))
+        assertEquals(PermissionStatus.NOT_NEEDED, PermissionPolicy.status(alarm, emptySet(), emptySet(), false, 30))
+        assertEquals(PermissionPolicy.Move.DONE, PermissionPolicy.onStart(PermissionStatus.NOT_NEEDED, true, Explain.SHEET))
+    }
 }

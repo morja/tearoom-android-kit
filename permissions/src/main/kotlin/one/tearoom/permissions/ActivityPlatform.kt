@@ -61,25 +61,34 @@ class ActivityPlatform(private val activity: Activity, private val launcher: (Li
 object PermissionSettings {
     /**
      * The page where [stage] is changed: the app's notification settings for notifications (the toggle
-     * is right there); App info for everything else, since the permission pages themselves are not
-     * public. The app's text names the rest of the way.
+     * is right there); the special accesses' own pages (notification access, "Alarms & reminders");
+     * App info for everything else, since the permission pages themselves are not public. The app's
+     * text names the rest of the way.
      */
     fun intent(context: Context, stage: PermissionKind): Intent = when (stage) {
         PermissionKind.Notifications -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         is PermissionKind.NotificationListener -> SpecialAccess.listenerIntent(context, stage)
-        else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+        PermissionKind.ExactAlarm -> SpecialAccess.exactAlarmIntent(context)
+        else -> appInfo(context)
     }
 
     /**
      * Opens [intent]; from an activity on top of it, so back returns to the screen. The activity is
      * found through wrappers (an app's themed or localised Compose context); only without one does
      * the page open in a task of its own. Where the notification listener's own page is missing (a
-     * system without it), the list of all notification listeners opens instead.
+     * system without it), the list of all notification listeners opens instead; where the
+     * "Alarms & reminders" page is missing, App info.
      */
     fun open(context: Context, stage: PermissionKind) {
         if (start(context, intent(context, stage))) return
-        if (stage is PermissionKind.NotificationListener) start(context, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        when (stage) {
+            is PermissionKind.NotificationListener -> start(context, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            PermissionKind.ExactAlarm -> start(context, appInfo(context))
+            else -> Unit
+        }
     }
+
+    private fun appInfo(context: Context) = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
 
     /**
      * The page of one notification channel of the app, with its switch, sound and vibration. Android
@@ -116,7 +125,7 @@ object PermissionSettings {
     fun option(context: Context, stage: PermissionKind): String = when (stage) {
         is PermissionKind.BackgroundLocation -> backgroundOptionLabel(context)
         // A special app access is never blocked, so no settings path names an option for it.
-        is PermissionKind.NotificationListener -> ""
+        is PermissionKind.NotificationListener, PermissionKind.ExactAlarm -> ""
         else -> groupLabel(context, stage)
     }
 
@@ -160,7 +169,7 @@ object PermissionSettings {
             PermissionKind.Microphone -> "MICROPHONE"
             PermissionKind.PhysicalActivity -> "ACTIVITY_RECOGNITION"
             is PermissionKind.NearbyDevices -> if (sdk >= 31) "NEARBY_DEVICES" else "LOCATION"
-            is PermissionKind.NotificationListener -> return ""
+            is PermissionKind.NotificationListener, PermissionKind.ExactAlarm -> return ""
             is PermissionKind.Media -> when {
                 sdk < 33 -> "STORAGE"
                 stage.images || stage.video -> "READ_MEDIA_VISUAL"

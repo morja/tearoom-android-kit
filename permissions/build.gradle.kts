@@ -4,10 +4,10 @@ plugins {
 
 // Apps depend on "one.tearoom:permissions"; the composite build substitutes this project (ADR-0001).
 // One flow for asking, losing and recovering a runtime permission (ADR-0005) or a special app access
-// (ADR-0007), headless: the surface
+// (ADR-0007, ADR-0008), headless: the surface
 // is the app's or the kit's :permissions-ui.
 group = "one.tearoom"
-version = "1.1.0"
+version = "1.2.0"
 
 android {
     namespace = "one.tearoom.permissions"

@@ -15,8 +15,8 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
   try again, restore, Play's feedback) and `UnlockSheet` (a Material 3 bottom sheet around it with
   title, intro and body slots), drawn from the host app's `MaterialTheme`; spacing through
   `UnlockStyle`, the only file with sizes. No theme, no text of its own.
-- `:permissions` (`one.tearoom:permissions`, 1.1.0) – one flow for asking, losing and recovering a
-  runtime permission (ADR-0005) or a special app access (notification access, ADR-0007): `AppPermission` (one per kind and app, with `PermissionTexts` and
+- `:permissions` (`one.tearoom:permissions`, 1.2.0) – one flow for asking, losing and recovering a
+  runtime permission (ADR-0005) or a special app access (notification access, ADR-0007; exact alarms, ADR-0008): `AppPermission` (one per kind and app, with `PermissionTexts` and
   `Explain`), `PermissionKind` with the Android version branches, `PermissionFlow` over the Activity
   Result APIs (`AppPermission.request(activity)`), pure rules in `PermissionPolicy`, the settings
   intents (the app's pages and the page of one notification channel) and the system's option label in
@@ -62,8 +62,8 @@ github.com/morja/tearoom-android-kit under Apache-2.0. Decisions live in
    (`testing/src/test/fixtures`) and `GuardrailsTest`/`TranslationsTest`. A change to a flow is tested
    once by hand on its reference app: the purchase on Dahlia with the billing test matrix of the
    skill `app-release`, the permissions on Weatherfold (location, background location) and Paperboat
-   (notifications) and LSX Switch (notification access) with the lifecycle matrix of the skill
-   `android-permissions` (ADR-0004, ADR-0005, ADR-0007).
+   (notifications) and LSX Switch (notification access, exact alarms) with the lifecycle matrix of the skill
+   `android-permissions` (ADR-0004, ADR-0005, ADR-0007, ADR-0008).
    In `:review` a case in `ReviewPolicyTest` or, at the Play and lifecycle boundary, `AppReviewTest`
    (Robolectric, a fake `ReviewLauncher`).
 7. Every app that includes the library must still pass its own checks after a change here; the
